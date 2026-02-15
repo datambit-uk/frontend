@@ -89,6 +89,7 @@ const ReportDetail: React.FC = () => {
         method: 'GET',
         jwtToken: true
       });
+      console.log('API Response for Report Detail:', result);
 
 
       if (result.code === 'success' && result.message && Array.isArray(result.message.file_uploads) && result.message.file_uploads.length > 0) {
@@ -170,7 +171,8 @@ const ReportDetail: React.FC = () => {
 
   const formatResult = (upload: FileUpload) => {
     // Helper function to get label color
-    const getLabelColor = (label: string) => {
+    const getLabelColor = (label: string | undefined | null) => {
+      if (!label) return 'text-gray-400'; // Return default color if label is undefined or null
       const lowerLabel = label.toLowerCase();
       if (lowerLabel === 'real') return 'text-green-400';
       if (lowerLabel === 'fake') return 'text-red-400';
@@ -317,12 +319,19 @@ const ReportDetail: React.FC = () => {
   }
 
 
+  useEffect(() => {
+    console.log('Data state updated:', data);
+    console.log('Error state updated:', error);
+    console.log('Loading state updated:', loading);
+  }, [data, error, loading]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="w-full h-full"
     >
+
       <div className="w-full h-full">
         <div className="flex flex-col gap-2 h-full py-1">
           {/* Summary Section */}
