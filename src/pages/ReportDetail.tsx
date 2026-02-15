@@ -180,7 +180,8 @@ const ReportDetail: React.FC = () => {
     };
 
     // Helper function to capitalize first character
-    const capitalizeFirst = (str: string) => {
+    const capitalizeFirst = (str: string | undefined | null) => {
+      if (!str) return '';
       return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
 
