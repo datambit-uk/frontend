@@ -77,10 +77,18 @@ const RecentFileUploads: React.FC = () => {
         params: { page: String(pageNum), per_page: String(perPage) },
         jwtToken: true,
       });
-      setUploads(res.message.data);
-      setHasNext(res.message.has_next);
-      setHasPrev(res.message.has_prev);
-      setTotal(res.message.total);
+      if (res && res.message && Array.isArray(res.message.data)) {
+        setUploads(res.message.data);
+        setHasNext(res.message.has_next);
+        setHasPrev(res.message.has_prev);
+        setTotal(res.message.total);
+      } else {
+        setError('Unexpected API response structure or no data available.');
+        setUploads([]); // Ensure uploads array is empty
+        setHasNext(false);
+        setHasPrev(false);
+        setTotal(0);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch uploads');
     } finally {
