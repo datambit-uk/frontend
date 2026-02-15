@@ -82,7 +82,7 @@ const ReportDetail: React.FC = () => {
         return;
       }
 
-      const url = `/api/v2/report/report?uploadID=${uploadId}`;
+      const url = `/api/v2/report/${uploadId}`;
 
       const result: ReportDetailResponse = await apiCall({
         endpoint: url,
