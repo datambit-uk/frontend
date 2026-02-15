@@ -11,10 +11,10 @@ interface FileMetadata {
 }
 
 interface Result {
-  audio_result: { label_audio: string; score_audio: number } | null;
+  audio_analysis: { label_audio: string; score_audio: number } | null;
   image_result: any | null;
-  video_result: any | null;
-  heatmap_url: string[];
+  video_analysis: any | null;
+  heatmap_url: string[] | null;
 }
 
 interface FileUpload {
@@ -90,14 +90,15 @@ const ReportDetail: React.FC = () => {
         jwtToken: true
       });
 
+
       if (result.code === 'success' && result.message && Array.isArray(result.message.file_uploads) && result.message.file_uploads.length > 0) {
         // If no content type is provided in URL, determine it from the first file with results
         if (!contentType) {
           const fileWithResults = result.message.file_uploads.find(upload => {
             if (upload.result) {
-              if (upload.result.audio_result !== null) return true;
+              if (upload.result.audio_analysis !== null) return true;
               if (upload.result.image_result !== null) return true;
-              if (upload.result.video_result !== null) return true;
+              if (upload.result.video_analysis !== null) return true;
             }
             return false;
           });
@@ -211,9 +212,9 @@ const ReportDetail: React.FC = () => {
     // If file is complete but has no results (all result fields are null)
     if (upload.file_status === 'complete' && 
         upload.result && 
-        !upload.result.audio_result && 
+        !upload.result.audio_analysis && 
         !upload.result.image_result && 
-        !upload.result.video_result) {
+        !upload.result.video_analysis) {
       return (
         <div>
           <span className="font-semibold text-red-400">Error:</span>
@@ -232,17 +233,16 @@ const ReportDetail: React.FC = () => {
           <div>
             <span className="font-semibold text-gray-300">Audio Analysis:</span>
             <br />
-            <span className="text-gray-400">
-              {upload.result?.audio_result ? 
-                `Label: ` : 'No score detected'}
-              {upload.result?.audio_result && (
-                <span className={getLabelColor(upload.result.audio_result.label_audio)}>
-                  {capitalizeFirst(upload.result.audio_result.label_audio)}
-                </span>
-              )}
-              {upload.result?.audio_result && `, Score: ${upload.result.audio_result.score_audio}`}
-            </span>
-          </div>
+                        <span className="text-gray-400">
+                          {upload.result?.audio_analysis ?
+                            `Label: ` : 'No score detected'}
+                          {upload.result?.audio_analysis && (
+                            <span className={getLabelColor(upload.result.audio_analysis.label_audio)}>
+                              {capitalizeFirst(upload.result.audio_analysis.label_audio)}
+                            </span>
+                          )}
+                          {upload.result?.audio_analysis && `, Score: ${upload.result.audio_analysis.score_audio}`}
+                        </span>          </div>
         );
       } else if (contentType === 'image') {
         return (
@@ -263,25 +263,24 @@ const ReportDetail: React.FC = () => {
         );
       } else if (contentType === 'video') {
         const results = [];
-        if (upload.result?.audio_result) {
+        if (upload.result?.audio_analysis) {
           results.push(
             <div key="audio" className="text-gray-400">
-              Audio - Label: <span className={getLabelColor(upload.result.audio_result.label_audio)}>
-                {capitalizeFirst(upload.result.audio_result.label_audio)}
-              </span>, Score: {upload.result.audio_result.score_audio}
+              Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.label_audio)}>
+                {capitalizeFirst(upload.result.audio_analysis.label_audio)}
+              </span>, Score: {upload.result.audio_analysis.score_audio}
             </div>
           );
         }
-        if (upload.result?.video_result) {
-          results.push(
-            <div key="video" className="text-gray-400">
-              Video - Label: <span className={getLabelColor(upload.result.video_result.label_video)}>
-                {capitalizeFirst(upload.result.video_result.label_video)}
-              </span>, Score: {upload.result.video_result.score_video}
-            </div>
-          );
-        }
-        return (
+                    if (upload.result?.video_analysis) {
+                      results.push(
+                        <div key="video" className="text-gray-400">
+                          Video - Label: <span className={getLabelColor(upload.result.video_analysis.label_video)}>
+                            {capitalizeFirst(upload.result.video_analysis.label_video)}
+                          </span>, Score: {upload.result.video_analysis.score_video}
+                        </div>
+                      );
+                    }        return (
           <div>
             <span className="font-semibold text-gray-300">Video Analysis:</span>
             <br />
@@ -305,13 +304,13 @@ const ReportDetail: React.FC = () => {
           if (result.image_result.label_image.toLowerCase() === "real") totalReal++;
           if (result.image_result.label_image.toLowerCase() === "fake") totalFake++;
         }
-        if (result.audio_result && result.audio_result.label_audio) {
-          if (result.audio_result.label_audio.toLowerCase() === "real") totalReal++;
-          if (result.audio_result.label_audio.toLowerCase() === "fake") totalFake++;
+        if (result.audio_analysis && result.audio_analysis.label_audio) {
+          if (result.audio_analysis.label_audio.toLowerCase() === "real") totalReal++;
+          if (result.audio_analysis.label_audio.toLowerCase() === "fake") totalFake++;
         }
-        if (result.video_result && result.video_result.label_video) {
-          if (result.video_result.label_video.toLowerCase() === "real") totalReal++;
-          if (result.video_result.label_video.toLowerCase() === "fake") totalFake++;
+        if (result.video_analysis && result.video_analysis.label_video) {
+          if (result.video_analysis.label_video.toLowerCase() === "real") totalReal++;
+          if (result.video_analysis.label_video.toLowerCase() === "fake") totalFake++;
         }
       }
     });
@@ -468,10 +467,10 @@ const ReportDetail: React.FC = () => {
                                               content_type: upload.file_metadata.content_type,
                                               size: upload.file_metadata.size,
                                               heatmap_urls: upload.result.heatmap_url,
-                                              label_audio: upload.result.audio_result?.label_audio || null,
-                                              score_audio: upload.result.audio_result?.score_audio || null,
-                                              label_video: upload.result.video_result?.label_video || null,
-                                              score_video: upload.result.video_result?.score_video || null,
+                                              label_audio: upload.result.audio_analysis?.label_audio || null,
+                                              score_audio: upload.result.audio_analysis?.score_audio || null,
+                                              label_video: upload.result.video_analysis?.label_video || null,
+                                              score_video: upload.result.video_analysis?.score_video || null,
                                               label_image: upload.result.image_result?.label_image || null,
                                               score_image: upload.result.image_result?.score_image || null
                                             };
@@ -559,10 +558,10 @@ const ReportDetail: React.FC = () => {
                                             content_type: upload.file_metadata.content_type,
                                             size: upload.file_metadata.size,
                                             heatmap_urls: upload.result.heatmap_url,
-                                            label_audio: upload.result.audio_result?.label_audio || null,
-                                            score_audio: upload.result.audio_result?.score_audio || null,
-                                            label_video: upload.result.video_result?.label_video || null,
-                                            score_video: upload.result.video_result?.score_video || null,
+                                            label_audio: upload.result.audio_analysis?.label_audio || null,
+                                            score_audio: upload.result.audio_analysis?.score_audio || null,
+                                            label_video: upload.result.video_analysis?.label_video || null,
+                                            score_video: upload.result.video_analysis?.score_video || null,
                                             label_image: upload.result.image_result?.label_image || null,
                                             score_image: upload.result.image_result?.score_image || null
                                           };
@@ -601,12 +600,12 @@ const ReportDetail: React.FC = () => {
                   isOpen={!!selectedHeatmap}
                   onClose={closeHeatmapModal}
                   images={selectedHeatmap.result.heatmap_url}
-                  label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_result?.label_audio || '' : ''}
-                  score_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_result?.score_audio || 0 : 0}
+                  label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.label_audio || '' : ''}
+                  score_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.score_audio || 0 : 0}
                   label_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.label_image || '') : ''}
                   score_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.score_image || 0) : 0}
-                  label_video={contentType === 'video' ? (selectedHeatmap.result.video_result?.label_video || '') : ''}
-                  score_video={contentType === 'video' ? (selectedHeatmap.result.video_result?.score_video || 0) : 0}
+                  label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.label_video || '') : ''}
+                  score_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.score_video || 0) : 0}
                 />
               )} */}
             </>
