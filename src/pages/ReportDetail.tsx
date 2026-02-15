@@ -11,9 +11,19 @@ interface FileMetadata {
 }
 
 interface Result {
-  audio_analysis: { label_audio: string; score_audio: number } | null;
+  audio_analysis: {
+    verdict: string;
+    error?: string; // Optional, as it might not always be present
+    score_audio?: number; // Optional, as it might not always be present
+  } | null;
   image_result: any | null;
-  video_analysis: any | null;
+  video_analysis: {
+    verdict: string;
+    predicted_class: string;
+    fake_confidence: number;
+    real_confidence: number;
+    score_video?: number; // Optional
+  } | null;
   heatmap_url: string[] | null;
 }
 
@@ -240,11 +250,11 @@ const ReportDetail: React.FC = () => {
                           {upload.result?.audio_analysis ?
                             `Label: ` : 'No score detected'}
                           {upload.result?.audio_analysis && (
-                            <span className={getLabelColor(upload.result.audio_analysis.label_audio)}>
-                              {capitalizeFirst(upload.result.audio_analysis.label_audio)}
+                            <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
+                              {capitalizeFirst(upload.result.audio_analysis.verdict)}
                             </span>
                           )}
-                          {upload.result?.audio_analysis && `, Score: ${upload.result.audio_analysis.score_audio}`}
+                          {upload.result?.audio_analysis?.score_audio !== undefined && `, Score: ${upload.result.audio_analysis.score_audio}`}
                         </span>          </div>
         );
       } else if (contentType === 'image') {
@@ -266,24 +276,25 @@ const ReportDetail: React.FC = () => {
         );
       } else if (contentType === 'video') {
         const results = [];
-        if (upload.result?.audio_analysis) {
-          results.push(
-            <div key="audio" className="text-gray-400">
-              Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.label_audio)}>
-                {capitalizeFirst(upload.result.audio_analysis.label_audio)}
-              </span>, Score: {upload.result.audio_analysis.score_audio}
-            </div>
-          );
-        }
-                    if (upload.result?.video_analysis) {
-                      results.push(
-                        <div key="video" className="text-gray-400">
-                          Video - Label: <span className={getLabelColor(upload.result.video_analysis.label_video)}>
-                            {capitalizeFirst(upload.result.video_analysis.label_video)}
-                          </span>, Score: {upload.result.video_analysis.score_video}
-                        </div>
-                      );
-                    }        return (
+                if (upload.result?.audio_analysis) {
+                  results.push(
+                    <div key="audio" className="text-gray-400">
+                      Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
+                        {capitalizeFirst(upload.result.audio_analysis.verdict)}
+                      </span>
+                      {upload.result.audio_analysis.verdict !== 'NO_AUDIO' && upload.result.audio_analysis.score_audio !== undefined && `, Score: ${upload.result.audio_analysis.score_audio}`}
+                    </div>
+                  );
+                }
+                if (upload.result?.video_analysis) {
+                  results.push(
+                    <div key="video" className="text-gray-400">
+                      Video - Label: <span className={getLabelColor(upload.result.video_analysis.verdict)}>
+                        {capitalizeFirst(upload.result.video_analysis.verdict)}
+                      </span>, Score: {upload.result.video_analysis.fake_confidence !== undefined ? upload.result.video_analysis.fake_confidence.toFixed(2) : 'N/A'}
+                    </div>
+                  );
+                }        return (
           <div>
             <span className="font-semibold text-gray-300">Video Analysis:</span>
             <br />
@@ -307,15 +318,15 @@ const ReportDetail: React.FC = () => {
           if (result.image_result.label_image.toLowerCase() === "real") totalReal++;
           if (result.image_result.label_image.toLowerCase() === "fake") totalFake++;
         }
-        if (result.audio_analysis && result.audio_analysis.label_audio) {
-          if (result.audio_analysis.label_audio.toLowerCase() === "real") totalReal++;
-          if (result.audio_analysis.label_audio.toLowerCase() === "fake") totalFake++;
+        if (result.audio_analysis && result.audio_analysis.verdict) {
+          if (result.audio_analysis.verdict.toLowerCase() === "real") totalReal++;
+          if (result.audio_analysis.verdict.toLowerCase() === "fake") totalFake++;
         }
-        if (result.video_analysis && result.video_analysis.label_video) {
-          if (result.video_analysis.label_video.toLowerCase() === "real") totalReal++;
-          if (result.video_analysis.label_video.toLowerCase() === "fake") totalFake++;
+        if (result.video_analysis && result.video_analysis.verdict) {
+          if (result.video_analysis.verdict.toLowerCase() === "real") totalReal++;
+          if (result.video_analysis.verdict.toLowerCase() === "fake") totalFake++;
         }
-      }
+      } // Closing curly brace for 'if (result)'
     });
   }
 
@@ -477,9 +488,9 @@ const ReportDetail: React.FC = () => {
                                               content_type: upload.file_metadata.content_type,
                                               size: upload.file_metadata.size,
                                               heatmap_urls: upload.result.heatmap_url,
-                                              label_audio: upload.result.audio_analysis?.label_audio || null,
+                                              label_audio: upload.result.audio_analysis?.verdict || null,
                                               score_audio: upload.result.audio_analysis?.score_audio || null,
-                                              label_video: upload.result.video_analysis?.label_video || null,
+                                              label_video: upload.result.video_analysis?.predicted_class || null,
                                               score_video: upload.result.video_analysis?.score_video || null,
                                               label_image: upload.result.image_result?.label_image || null,
                                               score_image: upload.result.image_result?.score_image || null
@@ -568,9 +579,9 @@ const ReportDetail: React.FC = () => {
                                             content_type: upload.file_metadata.content_type,
                                             size: upload.file_metadata.size,
                                             heatmap_urls: upload.result.heatmap_url,
-                                            label_audio: upload.result.audio_analysis?.label_audio || null,
+                                            label_audio: upload.result.audio_analysis?.verdict || null,
                                             score_audio: upload.result.audio_analysis?.score_audio || null,
-                                            label_video: upload.result.video_analysis?.label_video || null,
+                                            label_video: upload.result.video_analysis?.predicted_class || null,
                                             score_video: upload.result.video_analysis?.score_video || null,
                                             label_image: upload.result.image_result?.label_image || null,
                                             score_image: upload.result.image_result?.score_image || null
@@ -610,11 +621,11 @@ const ReportDetail: React.FC = () => {
                   isOpen={!!selectedHeatmap}
                   onClose={closeHeatmapModal}
                   images={selectedHeatmap.result.heatmap_url}
-                  label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.label_audio || '' : ''}
+                  label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.verdict || '' : ''}
                   score_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.score_audio || 0 : 0}
                   label_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.label_image || '') : ''}
                   score_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.score_image || 0) : 0}
-                  label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.label_video || '') : ''}
+                  label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.predicted_class || '') : ''}
                   score_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.score_video || 0) : 0}
                 />
               )} */}
