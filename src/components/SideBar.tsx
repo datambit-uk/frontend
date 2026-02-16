@@ -38,7 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
       <div className="p-6 border-b border-gray-800/50">
         <div className="flex items-center justify-center">
           <img 
-            src="/datambit_logo.png" 
+            src={import.meta.env.BASE_URL + 'datambit_logo.png'} 
             alt="Datambit Logo" 
             className="w-full h-12 object-contain"
           />

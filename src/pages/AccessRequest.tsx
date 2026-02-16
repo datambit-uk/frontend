@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { User, Building2, Briefcase, Mail, Phone, FileText, Loader2, AlertCircle, Check, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { apiCall } from "../api/api";
-import datambitLogo from "/datambit_logo.png";
+
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 
 interface FormData {
@@ -200,7 +200,7 @@ const AccessRequest: React.FC = () => {
         className="w-full max-w-2xl relative"
       >
         <div className="bg-gray-900/90 backdrop-blur-lg rounded-lg shadow-2xl p-8 border border-gray-800 max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-          <img src={datambitLogo} alt="Datambit logo" className="mx-auto h-20 mb-4" />
+          <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="mx-auto h-20 mb-4" />
           
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-white">Request Access</h1>

@@ -11,18 +11,44 @@ interface FileMetadata {
 }
 
 interface Result {
+  processing_time?: number;
+  duration?: number;
+  avg_inference_ms?: number;
   audio_analysis: {
     verdict: string;
-    error?: string; // Optional, as it might not always be present
-    score_audio?: number; // Optional, as it might not always be present
+    real_confidence: number;
+    fake_confidence: number;
+    error?: string;
+    score_audio?: number;
   } | null;
   image_result: any | null;
   video_analysis: {
     verdict: string;
+    prediction_score: number;
+    predicted_class_idx: number;
+    technique_detected: string;
+    ensemble_average: {
+      verdict: string;
+      predicted_class: string;
+      predicted_class_idx: number;
+      class_confidences: {
+        text_to_video?: number;
+        lip_sync?: number;
+        real?: number;
+        image_to_video?: number;
+        face_manipulation?: number;
+      };
+      real_confidence: number;
+      fake_confidence: number;
+      num_models: number;
+    };
     predicted_class: string;
     fake_confidence: number;
     real_confidence: number;
-    score_video?: number; // Optional
+    score_video?: number;
+  } | null;
+  metadata_analysis?: {
+    file_size: number;
   } | null;
   heatmap_url: string[] | null;
 }
@@ -179,6 +205,10 @@ const ReportDetail: React.FC = () => {
     return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const formatPercentage = (value: number): string => {
+    return (value * 100).toFixed(2) + '%';
+  };
+
   const formatResult = (upload: FileUpload) => {
     // Helper function to get label color
     const getLabelColor = (label: string | undefined | null) => {
@@ -275,29 +305,87 @@ const ReportDetail: React.FC = () => {
           </div>
         );
       } else if (contentType === 'video') {
+        const videoAnalysis = upload.result?.video_analysis;
+        const audioAnalysis = upload.result?.audio_analysis;
+        const metadataAnalysis = upload.result?.metadata_analysis;
+
         const results = [];
-                if (upload.result?.audio_analysis) {
-                  results.push(
-                    <div key="audio" className="text-gray-400">
-                      Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
-                        {capitalizeFirst(upload.result.audio_analysis.verdict)}
-                      </span>
-                      {upload.result.audio_analysis.verdict !== 'NO_AUDIO' && upload.result.audio_analysis.score_audio !== undefined && `, Score: ${upload.result.audio_analysis.score_audio}`}
-                    </div>
-                  );
-                }
-                if (upload.result?.video_analysis) {
-                  results.push(
-                    <div key="video" className="text-gray-400">
-                      Video - Label: <span className={getLabelColor(upload.result.video_analysis.verdict)}>
-                        {capitalizeFirst(upload.result.video_analysis.verdict)}
-                      </span>, Score: {upload.result.video_analysis.fake_confidence !== undefined ? upload.result.video_analysis.fake_confidence.toFixed(2) : 'N/A'}
-                    </div>
-                  );
-                }        return (
+
+        if (videoAnalysis) {
+          results.push(
+            <div key="video-main" className="mb-4">
+              {videoAnalysis.ensemble_average && (
+                <div className="mt-2">
+                  <h5 className="font-semibold text-gray-300 ml-2">Video Ensemble Average:</h5>
+                  <div className="text-gray-400 text-sm ml-4">
+                    <div>Verdict: <span className={getLabelColor(videoAnalysis.ensemble_average.verdict)}>{capitalizeFirst(videoAnalysis.ensemble_average.verdict)}</span></div>
+                    <div>Predicted Class: {videoAnalysis.ensemble_average.predicted_class}</div>
+                    <div>Predicted Class Index: {videoAnalysis.ensemble_average.predicted_class_idx}</div>
+                    <div>Real Confidence: {formatPercentage(videoAnalysis.ensemble_average.real_confidence)}</div>
+                    <div>Fake Confidence: {formatPercentage(videoAnalysis.ensemble_average.fake_confidence)}</div>
+                    <div>Number of Models: {videoAnalysis.ensemble_average.num_models}</div>
+                    {videoAnalysis.ensemble_average.class_confidences && (
+                      <div className="mt-1">
+                        <h6 className="font-semibold text-gray-400 text-xs">Class Confidences:</h6>
+                        <ul className="list-disc list-inside ml-2">
+                          {Object.entries(videoAnalysis.ensemble_average.class_confidences).map(([key, value]) => (
+                            <li key={key}>{capitalizeFirst(key.replace(/_/g, ' '))}: {formatPercentage(value as number)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (audioAnalysis) {
+          results.push(
+            <div key="audio-analysis" className="mb-4">
+              <h4 className="font-semibold text-gray-300">Audio Analysis:</h4>
+              <div className="text-gray-400 text-sm ml-2">
+                <div>Verdict: <span className={getLabelColor(audioAnalysis.verdict)}>{capitalizeFirst(audioAnalysis.verdict)}</span></div>
+                {audioAnalysis.verdict !== 'NO_AUDIO' && (
+                  <>
+                    <div>Real Confidence: {formatPercentage(audioAnalysis.real_confidence)}</div>
+                    <div>Fake Confidence: {formatPercentage(audioAnalysis.fake_confidence)}</div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        // Performance Metrics
+        if (upload.result?.processing_time !== undefined || upload.result?.duration !== undefined || upload.result?.avg_inference_ms !== undefined) {
+          results.push(
+            <div key="performance-metrics" className="mb-4">
+              <h4 className="font-semibold text-gray-300">Performance Metrics:</h4>
+              <div className="text-gray-400 text-sm ml-2">
+                {upload.result?.processing_time !== undefined && <div>Processing Time: {upload.result.processing_time.toFixed(2)}s</div>}
+                {upload.result?.duration !== undefined && <div>Duration: {upload.result.duration.toFixed(2)}s</div>}
+                {upload.result?.avg_inference_ms !== undefined && <div>Avg Inference MS: {upload.result.avg_inference_ms.toFixed(2)}ms</div>}
+              </div>
+            </div>
+          );
+        }
+
+        // Metadata Analysis - File Size
+        if (metadataAnalysis?.file_size !== undefined) {
+          results.push(
+            <div key="metadata-analysis" className="mb-4">
+              <h4 className="font-semibold text-gray-300">Metadata Analysis:</h4>
+              <div className="text-gray-400 text-sm ml-2">
+                <div>File Size: {formatFileSize(metadataAnalysis.file_size)}</div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
           <div>
-            <span className="font-semibold text-gray-300">Video Analysis:</span>
-            <br />
             {results.length > 0 ? results : <span className="text-gray-400">No issues detected</span>}
           </div>
         );

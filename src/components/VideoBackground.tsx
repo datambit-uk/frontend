@@ -1,5 +1,5 @@
 import React from 'react';
-import datambitLogo from '/datambit_logo.png';
+
 import { motion } from 'framer-motion';
 
 interface VideoBackgroundProps {
@@ -44,7 +44,7 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ videoSrc }) => {
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          src={datambitLogo}
+          src={import.meta.env.BASE_URL + 'datambit_logo.png'}
           alt="Datambit logo"
           className="w-96 h-auto"
         />

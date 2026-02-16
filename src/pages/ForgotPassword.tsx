@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, Check, AlertCircle } from "lucide-react";
 import { apiCall } from "../api/api";
-import datambitLogo from "/datambit_logo.png";
+
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -167,7 +167,7 @@ const PasswordReset: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="bg-gray-900/90 backdrop-blur-lg rounded-lg shadow-2xl p-8 border border-gray-800"
         >
-          <img src={datambitLogo} alt="Datambit logo" className="mx-auto h-20 mb-4" />
+          <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="mx-auto h-20 mb-4" />
           
           <motion.div
             initial={{ y: -20, opacity: 0 }}

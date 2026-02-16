@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { User, Menu } from "lucide-react";
-import datambit_logo from "/datambit_logo.png";
+
 import SearchBar from "./SearchBar";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthenticationContent";
@@ -75,7 +75,7 @@ const Header: React.FC<HeaderProps> = ({ onSidebarToggle }) => {
         {/* Logo - Only visible on mobile */}
         <div className="md:hidden">
           <img 
-            src={datambit_logo}
+            src={import.meta.env.BASE_URL + 'datambit_logo.png'}
             alt="Datambit Logo"
             className="h-8 w-auto"
           />
