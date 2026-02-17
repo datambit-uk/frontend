@@ -276,16 +276,44 @@ const ReportDetail: React.FC = () => {
           <div>
             <span className="font-semibold text-gray-300">Audio Analysis:</span>
             <br />
-                        <span className="text-gray-400">
-                          {upload.result?.audio_analysis ?
-                            `Label: ` : 'No score detected'}
-                          {upload.result?.audio_analysis && (
-                            <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
-                              {capitalizeFirst(upload.result.audio_analysis.verdict)}
-                            </span>
-                          )}
-                          {upload.result?.audio_analysis?.score_audio !== undefined && `, Score: ${upload.result.audio_analysis.score_audio}`}
-                        </span>          </div>
+            {upload.result?.audio_analysis ? (
+              <div className="text-gray-400 text-sm ml-2">
+                <div>
+                  Verdict:{" "}
+                  <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
+                    {capitalizeFirst(upload.result.audio_analysis.verdict)}
+                  </span>
+                </div>
+                {upload.result.audio_analysis.real_confidence !== undefined && (
+                  <div>
+                    Real Confidence:{" "}
+                    {formatPercentage(upload.result.audio_analysis.real_confidence)}
+                  </div>
+                )}
+                {upload.result.audio_analysis.fake_confidence !== undefined && (
+                  <div>
+                    Fake Confidence:{" "}
+                    {formatPercentage(upload.result.audio_analysis.fake_confidence)}
+                  </div>
+                )}
+                {upload.result?.audio_analysis?.score_audio !== undefined && (
+                  <div>Score: {upload.result.audio_analysis.score_audio}</div>
+                )}
+                {upload.result.processing_time !== undefined && (
+                  <div>Processing Time: {upload.result.processing_time.toFixed(2)}s</div>
+                )}
+                {upload.result.duration !== undefined && (
+                  <div>Duration: {upload.result.duration.toFixed(2)}s</div>
+                )}
+                {upload.result.avg_inference_ms !== undefined && (
+                  <div>
+                    Avg Inference MS: {upload.result.avg_inference_ms.toFixed(2)}ms
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-gray-400">No audio analysis detected</span>
+            )}          </div>
         );
       } else if (contentType === 'image') {
         return (
