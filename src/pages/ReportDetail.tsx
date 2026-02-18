@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// import Modal from '../components/HeatMap'; 
+// import Modal from '../components/HeatMap';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 
@@ -11,44 +11,18 @@ interface FileMetadata {
 }
 
 interface Result {
-  processing_time?: number;
-  duration?: number;
-  avg_inference_ms?: number;
   audio_analysis: {
     verdict: string;
-    real_confidence: number;
-    fake_confidence: number;
-    error?: string;
-    score_audio?: number;
+    error?: string; // Optional, as it might not always be present
+    score_audio?: number; // Optional, as it might not always be present
   } | null;
   image_result: any | null;
   video_analysis: {
     verdict: string;
-    prediction_score: number;
-    predicted_class_idx: number;
-    technique_detected: string;
-    ensemble_average: {
-      verdict: string;
-      predicted_class: string;
-      predicted_class_idx: number;
-      class_confidences: {
-        text_to_video?: number;
-        lip_sync?: number;
-        real?: number;
-        image_to_video?: number;
-        face_manipulation?: number;
-      };
-      real_confidence: number;
-      fake_confidence: number;
-      num_models: number;
-    };
     predicted_class: string;
     fake_confidence: number;
     real_confidence: number;
-    score_video?: number;
-  } | null;
-  metadata_analysis?: {
-    file_size: number;
+    score_video?: number; // Optional
   } | null;
   heatmap_url: string[] | null;
 }
@@ -56,7 +30,7 @@ interface Result {
 interface FileUpload {
   file_metadata: FileMetadata;
   file_status: string;
-  result: Result | null; 
+  result: Result | null;
 }
 
 interface ReportDetailResponse {
@@ -104,7 +78,7 @@ const ReportDetail: React.FC = () => {
       clearPolling();
     }
   }, [hasProcessingItems]);
-  
+
   const fetchReportDetail = async () => {
     setLoading(state => state === false); // Only set loading true on initial fetch
     setError(null);
@@ -153,7 +127,7 @@ const ReportDetail: React.FC = () => {
           if (upload.file_status === 'processing' || upload.file_status === 'error') {
             return true;
           }
-          
+
           // For completed files, show them if they match the content type
           if (upload.file_status === 'complete') {
             if (contentType === 'audio') {
@@ -168,7 +142,7 @@ const ReportDetail: React.FC = () => {
         });
 
         setData(filteredUploads);
-        
+
         // Check for processing items in the new data
         const hasProcessing = checkForProcessingItems(filteredUploads);
         setHasProcessingItems(hasProcessing);
@@ -199,14 +173,10 @@ const ReportDetail: React.FC = () => {
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
-    
+
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatPercentage = (value: number): string => {
-    return (value * 100).toFixed(2) + '%';
   };
 
   const formatResult = (upload: FileUpload) => {
@@ -229,11 +199,11 @@ const ReportDetail: React.FC = () => {
     if (upload.file_status === 'error') {
       return (
         <div>
-          <span className="font-semibold text-red-400">Error:</span>
-          <br />
-          <span className="text-xs text-red-400">
-            Failed to process file
-          </span>
+        <span className="font-semibold text-red-400">Error:</span>
+        <br />
+        <span className="text-xs text-red-400">
+        Failed to process file
+        </span>
         </div>
       );
     }
@@ -242,184 +212,92 @@ const ReportDetail: React.FC = () => {
     if (upload.file_status === 'processing') {
       return (
         <div>
-          <span className="font-semibold text-gray-300">File Info:</span>
-          <br />
-          <span className="text-xs text-gray-400">
-            Type: {upload.file_metadata.content_type}, 
-            Size: {formatFileSize(upload.file_metadata.size)}
-          </span>
+        <span className="font-semibold text-gray-300">File Info:</span>
+        <br />
+        <span className="text-xs text-gray-400">
+        Type: {upload.file_metadata.content_type},
+        Size: {formatFileSize(upload.file_metadata.size)}
+        </span>
         </div>
       );
     }
 
     // If file is complete but has no results (all result fields are null)
-    if (upload.file_status === 'complete' && 
-        upload.result && 
-        !upload.result.audio_analysis && 
-        !upload.result.image_result && 
-        !upload.result.video_analysis) {
+    if (upload.file_status === 'complete' &&
+      upload.result &&
+      !upload.result.audio_analysis &&
+      !upload.result.image_result &&
+      !upload.result.video_analysis) {
       return (
         <div>
-          <span className="font-semibold text-red-400">Error:</span>
-          <br />
-          <span className="text-xs text-red-400">
-            No results available - Processing failed
-          </span>
+        <span className="font-semibold text-red-400">Error:</span>
+        <br />
+        <span className="text-xs text-red-400">
+        No results available - Processing failed
+        </span>
         </div>
       );
-    }
+      }
 
-    // If file is complete with results, display results as before
-    if (upload.file_status === 'complete') {
-      if (contentType === 'audio') {
-        return (
-          <div>
-            <span className="font-semibold text-gray-300">Audio Analysis:</span>
-            <br />
-            {upload.result?.audio_analysis ? (
-              <div className="text-gray-400 text-sm ml-2">
-                <div>
-                  Verdict:{" "}
-                  <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
-                    {capitalizeFirst(upload.result.audio_analysis.verdict)}
-                  </span>
-                </div>
-                {upload.result.audio_analysis.real_confidence !== undefined && (
-                  <div>
-                    Real Confidence:{" "}
-                    {formatPercentage(upload.result.audio_analysis.real_confidence)}
-                  </div>
-                )}
-                {upload.result.audio_analysis.fake_confidence !== undefined && (
-                  <div>
-                    Fake Confidence:{" "}
-                    {formatPercentage(upload.result.audio_analysis.fake_confidence)}
-                  </div>
-                )}
-                {upload.result?.audio_analysis?.score_audio !== undefined && (
-                  <div>Score: {upload.result.audio_analysis.score_audio}</div>
-                )}
-                {upload.result.processing_time !== undefined && (
-                  <div>Processing Time: {upload.result.processing_time.toFixed(2)}s</div>
-                )}
-                {upload.result.duration !== undefined && (
-                  <div>Duration: {upload.result.duration.toFixed(2)}s</div>
-                )}
-                {upload.result.avg_inference_ms !== undefined && (
-                  <div>
-                    Avg Inference MS: {upload.result.avg_inference_ms.toFixed(2)}ms
-                  </div>
-                )}
-              </div>
-            ) : (
-              <span className="text-gray-400">No audio analysis detected</span>
-            )}          </div>
-        );
-      } else if (contentType === 'image') {
-        return (
-          <div>
-            <span className="font-semibold text-gray-300">Image Analysis:</span>
-            <br />
+      // If file is complete with results, display results as before
+      if (upload.file_status === 'complete') {
+        if (contentType === 'audio') {
+          return (
+            <div>
             <span className="text-gray-400">
-              {upload.result?.image_result ? 
-                `Label: ` : 'No attachment detected'}
-              {upload.result?.image_result && (
-                <span className={getLabelColor(upload.result.image_result.label_image)}>
-                  {capitalizeFirst(upload.result.image_result.label_image)}
+            {upload.result?.audio_analysis ?
+              `Label: ` : 'No score detected'}
+              {upload.result?.audio_analysis && (
+                <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
+                {capitalizeFirst(upload.result.audio_analysis.verdict)}
                 </span>
               )}
-              {upload.result?.image_result && `, Score: ${upload.result.image_result.score_image}`}
-            </span>
-          </div>
-        );
-      } else if (contentType === 'video') {
-        const videoAnalysis = upload.result?.video_analysis;
-        const audioAnalysis = upload.result?.audio_analysis;
-        const metadataAnalysis = upload.result?.metadata_analysis;
-
-        const results = [];
-
-        if (videoAnalysis) {
-          results.push(
-            <div key="video-main" className="mb-4">
-              {videoAnalysis.ensemble_average && (
-                <div className="mt-2">
-                  <h5 className="font-semibold text-gray-300 ml-2">Video Ensemble Average:</h5>
-                  <div className="text-gray-400 text-sm ml-4">
-                    <div>Verdict: <span className={getLabelColor(videoAnalysis.ensemble_average.verdict)}>{capitalizeFirst(videoAnalysis.ensemble_average.verdict)}</span></div>
-                    <div>Predicted Class: {videoAnalysis.ensemble_average.predicted_class}</div>
-                    <div>Predicted Class Index: {videoAnalysis.ensemble_average.predicted_class_idx}</div>
-                    <div>Real Confidence: {formatPercentage(videoAnalysis.ensemble_average.real_confidence)}</div>
-                    <div>Fake Confidence: {formatPercentage(videoAnalysis.ensemble_average.fake_confidence)}</div>
-                    <div>Number of Models: {videoAnalysis.ensemble_average.num_models}</div>
-                    {videoAnalysis.ensemble_average.class_confidences && (
-                      <div className="mt-1">
-                        <h6 className="font-semibold text-gray-400 text-xs">Class Confidences:</h6>
-                        <ul className="list-disc list-inside ml-2">
-                          {Object.entries(videoAnalysis.ensemble_average.class_confidences).map(([key, value]) => (
-                            <li key={key}>{capitalizeFirst(key.replace(/_/g, ' '))}: {formatPercentage(value as number)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {upload.result?.audio_analysis?.score_audio !== undefined }
+              </span>          </div>
+          );
+        } else if (contentType === 'image') {
+          return (
+            <div>
+            <span className="text-gray-400">
+            {upload.result?.image_result ?
+              `Label: ` : 'No attachment detected'}
+              {upload.result?.image_result && (
+                <span className={getLabelColor(upload.result.image_result.label_image)}>
+                {capitalizeFirst(upload.result.image_result.label_image)}
+                </span>
               )}
-            </div>
-          );
-        }
-
-        if (audioAnalysis) {
-          results.push(
-            <div key="audio-analysis" className="mb-4">
-              <h4 className="font-semibold text-gray-300">Audio Analysis:</h4>
-              <div className="text-gray-400 text-sm ml-2">
-                <div>Verdict: <span className={getLabelColor(audioAnalysis.verdict)}>{capitalizeFirst(audioAnalysis.verdict)}</span></div>
-                {audioAnalysis.verdict !== 'NO_AUDIO' && (
-                  <>
-                    <div>Real Confidence: {formatPercentage(audioAnalysis.real_confidence)}</div>
-                    <div>Fake Confidence: {formatPercentage(audioAnalysis.fake_confidence)}</div>
-                  </>
-                )}
+              {upload.result?.image_result }
+              </span>
               </div>
-            </div>
           );
-        }
-
-        // Performance Metrics
-        if (upload.result?.processing_time !== undefined || upload.result?.duration !== undefined || upload.result?.avg_inference_ms !== undefined) {
-          results.push(
-            <div key="performance-metrics" className="mb-4">
-              <h4 className="font-semibold text-gray-300">Performance Metrics:</h4>
-              <div className="text-gray-400 text-sm ml-2">
-                {upload.result?.processing_time !== undefined && <div>Processing Time: {upload.result.processing_time.toFixed(2)}s</div>}
-                {upload.result?.duration !== undefined && <div>Duration: {upload.result.duration.toFixed(2)}s</div>}
-                {upload.result?.avg_inference_ms !== undefined && <div>Avg Inference MS: {upload.result.avg_inference_ms.toFixed(2)}ms</div>}
+        } else if (contentType === 'video') {
+          const results = [];
+          if (upload.result?.audio_analysis) {
+            results.push(
+              <div key="audio" className="text-gray-400">
+              Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
+              {capitalizeFirst(upload.result.audio_analysis.verdict)}
+              </span>
+              {upload.result.audio_analysis.verdict !== 'NO_AUDIO' && upload.result.audio_analysis.score_audio !== undefined }
               </div>
-            </div>
-          );
-        }
-
-        // Metadata Analysis - File Size
-        if (metadataAnalysis?.file_size !== undefined) {
-          results.push(
-            <div key="metadata-analysis" className="mb-4">
-              <h4 className="font-semibold text-gray-300">Metadata Analysis:</h4>
-              <div className="text-gray-400 text-sm ml-2">
-                <div>File Size: {formatFileSize(metadataAnalysis.file_size)}</div>
+            );
+          }
+          if (upload.result?.video_analysis) {
+            results.push(
+              <div key="video" className="text-gray-400">
+              Video - Label: <span className={getLabelColor(upload.result.video_analysis.verdict)}>
+              {capitalizeFirst(upload.result.video_analysis.verdict)}
+              </span>
               </div>
-            </div>
-          );
-        }
-
-        return (
-          <div>
+            );
+          }        return (
+            <div>
             {results.length > 0 ? results : <span className="text-gray-400">No issues detected</span>}
-          </div>
-        );
+            </div>
+          );
+        }
       }
-    }
-    return <span className="text-gray-400">-</span>;
+      return <span className="text-gray-400">-</span>;
   };
 
   // Calculate summary stats
@@ -454,301 +332,301 @@ const ReportDetail: React.FC = () => {
   }, [data, error, loading]);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="w-full h-full"
+    <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="w-full h-full"
     >
 
-      <div className="w-full h-full">
-        <div className="flex flex-col gap-2 h-full py-1">
-          {/* Summary Section */}
-          {fileUploads.length > 0 ? (
-            <div className="flex flex-row flex-wrap items-center justify-between gap-4 py-2 px-1 mb-2 w-full">
-              {/* Upload ID left */}
-              <div className="flex flex-col items-start min-w-[120px] flex-1">
-                <span className="text-xs text-gray-400">Upload ID</span>
-                <span className="text-lg font-bold font-mono text-blue-300 break-all max-w-[320px] tracking-wide leading-tight select-all">
-                  {uploadId}
-                </span>
-              </div>
-              {/* Center: Real/Fake */}
-              <div className="flex flex-row items-center gap-8 flex-1 justify-center">
-                <div className="flex flex-col items-center min-w-[80px]">
-                  <span className="text-xs text-gray-400">Total Real Uploads</span>
-                  <span className="text-lg font-bold text-green-400">{totalReal}</span>
-                </div>
-                <div className="w-px h-6 bg-gray-700 mx-2" />
-                <div className="flex flex-col items-center min-w-[80px]">
-                  <span className="text-xs text-gray-400">Total Fake Uploads</span>
-                  <span className="text-lg font-bold text-red-400">{totalFake}</span>
-                </div>
-              </div>
-              {/* Back Button right */}
-              <div className="flex flex-col items-end min-w-[60px] flex-1 justify-center">
-                <button 
-                  className="text-blue-400 hover:text-blue-300 transition-all duration-200 text-sm p-2 rounded-full"
-                  onClick={handleBackToReport}
-                  aria-label="Back"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-6 w-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-40">
-              <span className="text-gray-400 text-lg">No results available</span>
-            </div>
-          )}
-
-          {/* Only render table/cards if there are files */}
-          {fileUploads.length > 0 && (
-            <>
-              {/* Error Message */}
-              {error && (
-                <div className="text-red-400 text-sm text-center">{error}</div>
-              )}
-
-              {/* Loading State */}
-              {loading && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-center text-gray-400 p-6"
-                >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="inline-block w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full"
-                  />
-                  <span className="ml-2">Loading...</span>
-                </motion.div>
-              )}
-
-              {/* Table */}
-              {!loading && !error && (
-                <motion.div 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                  className="flex-1 bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 min-h-0"
-                >
-                  <div className="h-full overflow-hidden rounded-2xl">
-                    <div className="h-full overflow-y-auto">
-                      {/* Desktop Table View */}
-                      <div className="hidden md:block">
-                        <table className="min-w-full divide-y divide-gray-700/50">
-                          <thead className="sticky top-0 bg-gray-800/95 backdrop-blur-sm z-10">
-                            <tr>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                Filename
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                File Status
-                              </th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                Result
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-700/50">
-                            {data.map((upload, index) => (
-                              <motion.tr
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.3, delay: index * 0.05 }}
-                                key={index}
-                                className="hover:bg-gray-700/20 transition-all duration-200"
-                              >
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
-                                  <div className="relative group">
-                                    <div className="max-w-[500px] truncate">
-                                      {upload.file_metadata.filename}
-                                    </div>
-                                    {upload.file_metadata.filename.length > 25 && (
-                                      <div className="absolute left-0 -top-8 scale-0 transition-all rounded bg-gray-800 p-2 text-xs text-gray-100 group-hover:scale-100 whitespace-nowrap z-20">
-                                        {upload.file_metadata.filename}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <motion.span
-                                    whileHover={{ scale: 1.05 }}
-                                    className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
-                                      upload.file_status === 'complete'
-                                        ? 'bg-green-900/50 text-green-400'
-                                        : upload.file_status === 'pending'
-                                        ? 'bg-yellow-900/50 text-yellow-400'
-                                        : upload.file_status === 'processing'
-                                        ? 'bg-blue-900/50 text-blue-400'
-                                        : 'bg-red-900/50 text-red-400'
-                                    }`}
-                                  >
-                                    {upload.file_status}
-                                  </motion.span>
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-300">
-                                  <div className="flex justify-between items-center gap-2">
-                                    <div>{formatResult(upload)}</div>
-                                    {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
-                                      <button
-                                        onClick={() => {
-                                          if (upload.result) {
-                                            const analysisData = {
-                                              upload_id: uploadId,
-                                              filename: upload.file_metadata.filename,
-                                              content_type: upload.file_metadata.content_type,
-                                              size: upload.file_metadata.size,
-                                              heatmap_urls: upload.result.heatmap_url,
-                                              label_audio: upload.result.audio_analysis?.verdict || null,
-                                              score_audio: upload.result.audio_analysis?.score_audio || null,
-                                              label_video: upload.result.video_analysis?.predicted_class || null,
-                                              score_video: upload.result.video_analysis?.score_video || null,
-                                              label_image: upload.result.image_result?.label_image || null,
-                                              score_image: upload.result.image_result?.score_image || null
-                                            };
-                                            navigate('/analysis', { state: analysisData });
-                                          }
-                                        }}
-                                        className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                        aria-label="View Heatmap"
-                                      >
-                                        <svg
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          className="h-5 w-5"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                        >
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </motion.tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Mobile Card View */}
-                      <div className="md:hidden w-full">
-                        <div className="space-y-4 p-2 w-full">
-                          {data.map((upload, index) => (
-                            <motion.div
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.3, delay: index * 0.05 }}
-                              key={index}
-                              className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50 w-full overflow-x-auto"
-                            >
-                              {/* Filename */}
-                              <div className="mb-3">
-                                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                                  Filename
-                                </div>
-                                <div className="text-sm font-medium text-gray-300 break-all">
-                                  {upload.file_metadata.filename}
-                                </div>
-                              </div>
-
-                              {/* File Status */}
-                              <div className="mb-3">
-                                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                                  File Status
-                                </div>
-                                <motion.span
-                                  whileHover={{ scale: 1.05 }}
-                                  className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
-                                    upload.file_status === 'complete'
-                                      ? 'bg-green-900/50 text-green-400'
-                                      : upload.file_status === 'pending'
-                                      ? 'bg-yellow-900/50 text-yellow-400'
-                                      : upload.file_status === 'processing'
-                                      ? 'bg-blue-900/50 text-blue-400'
-                                      : 'bg-red-900/50 text-red-400'
-                                  }`}
-                                >
-                                  {upload.file_status}
-                                </motion.span>
-                              </div>
-
-                              {/* Result */}
-                              <div>
-                                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
-                                  Result
-                                </div>
-                                <div className="flex justify-between items-start gap-2">
-                                  <div className="flex-1">{formatResult(upload)}</div>
-                                  {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
-                                    <button
-                                      onClick={() => {
-                                        if (upload.result) {
-                                          const analysisData = {
-                                            upload_id: uploadId,
-                                            filename: upload.file_metadata.filename,
-                                            content_type: upload.file_metadata.content_type,
-                                            size: upload.file_metadata.size,
-                                            heatmap_urls: upload.result.heatmap_url,
-                                            label_audio: upload.result.audio_analysis?.verdict || null,
-                                            score_audio: upload.result.audio_analysis?.score_audio || null,
-                                            label_video: upload.result.video_analysis?.predicted_class || null,
-                                            score_video: upload.result.video_analysis?.score_video || null,
-                                            label_image: upload.result.image_result?.label_image || null,
-                                            score_image: upload.result.image_result?.score_image || null
-                                          };
-                                          navigate('/analysis', { state: analysisData });
-                                        }
-                                      }}
-                                      className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                                      aria-label="View Heatmap"
-                                    >
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-5 w-5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Heatmap Modal */}
-              {/* {selectedHeatmap && selectedHeatmap.result && (
-                // <AnalysisModal />
-                <Modal
-                  isOpen={!!selectedHeatmap}
-                  onClose={closeHeatmapModal}
-                  images={selectedHeatmap.result.heatmap_url}
-                  label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.verdict || '' : ''}
-                  score_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.score_audio || 0 : 0}
-                  label_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.label_image || '') : ''}
-                  score_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.score_image || 0) : 0}
-                  label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.predicted_class || '') : ''}
-                  score_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.score_video || 0) : 0}
-                />
-              )} */}
-            </>
-          )}
-        </div>
+    <div className="w-full h-full">
+    <div className="flex flex-col gap-2 h-full py-1">
+    {/* Summary Section */}
+    {fileUploads.length > 0 ? (
+      <div className="flex flex-row flex-wrap items-center justify-between gap-4 py-2 px-1 mb-2 w-full">
+      {/* Upload ID left */}
+      <div className="flex flex-col items-start min-w-[120px] flex-1">
+      <span className="text-xs text-gray-400">Upload ID</span>
+      <span className="text-lg font-bold font-mono text-blue-300 break-all max-w-[320px] tracking-wide leading-tight select-all">
+      {uploadId}
+      </span>
       </div>
+      {/* Center: Real/Fake */}
+      <div className="flex flex-row items-center gap-8 flex-1 justify-center">
+      <div className="flex flex-col items-center min-w-[80px]">
+      <span className="text-xs text-gray-400">Total Real Uploads</span>
+      <span className="text-lg font-bold text-green-400">{totalReal}</span>
+      </div>
+      <div className="w-px h-6 bg-gray-700 mx-2" />
+      <div className="flex flex-col items-center min-w-[80px]">
+      <span className="text-xs text-gray-400">Total Fake Uploads</span>
+      <span className="text-lg font-bold text-red-400">{totalFake}</span>
+      </div>
+      </div>
+      {/* Back Button right */}
+      <div className="flex flex-col items-end min-w-[60px] flex-1 justify-center">
+      <button
+      className="text-blue-400 hover:text-blue-300 transition-all duration-200 text-sm p-2 rounded-full"
+      onClick={handleBackToReport}
+      aria-label="Back"
+      >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-6 w-6">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      </svg>
+      </button>
+      </div>
+      </div>
+    ) : (
+      <div className="flex justify-center items-center h-40">
+      <span className="text-gray-400 text-lg">No results available</span>
+      </div>
+    )}
+
+    {/* Only render table/cards if there are files */}
+    {fileUploads.length > 0 && (
+      <>
+      {/* Error Message */}
+      {error && (
+        <div className="text-red-400 text-sm text-center">{error}</div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="text-center text-gray-400 p-6"
+        >
+        <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        className="inline-block w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full"
+        />
+        <span className="ml-2">Loading...</span>
+        </motion.div>
+      )}
+
+      {/* Table */}
+      {!loading && !error && (
+        <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="flex-1 bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 min-h-0"
+        >
+        <div className="h-full overflow-hidden rounded-2xl">
+        <div className="h-full overflow-y-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+        <table className="min-w-full divide-y divide-gray-700/50">
+        <thead className="sticky top-0 bg-gray-800/95 backdrop-blur-sm z-10">
+        <tr>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+        Filename
+        </th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+        File Status
+        </th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+        Result
+        </th>
+        </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700/50">
+        {data.map((upload, index) => (
+          <motion.tr
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.05 }}
+          key={index}
+          className="hover:bg-gray-700/20 transition-all duration-200"
+          >
+          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
+          <div className="relative group">
+          <div className="max-w-[500px] truncate">
+          {upload.file_metadata.filename}
+          </div>
+          {upload.file_metadata.filename.length > 25 && (
+            <div className="absolute left-0 -top-8 scale-0 transition-all rounded bg-gray-800 p-2 text-xs text-gray-100 group-hover:scale-100 whitespace-nowrap z-20">
+            {upload.file_metadata.filename}
+            </div>
+          )}
+          </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+          <motion.span
+          whileHover={{ scale: 1.05 }}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
+            upload.file_status === 'complete'
+            ? 'bg-green-900/50 text-green-400'
+            : upload.file_status === 'pending'
+            ? 'bg-yellow-900/50 text-yellow-400'
+            : upload.file_status === 'processing'
+            ? 'bg-blue-900/50 text-blue-400'
+            : 'bg-red-900/50 text-red-400'
+          }`}
+          >
+          {upload.file_status}
+          </motion.span>
+          </td>
+          <td className="px-6 py-4 text-sm text-gray-300">
+          <div className="flex justify-between items-center gap-2">
+          <div>{formatResult(upload)}</div>
+          {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
+            <button
+            onClick={() => {
+              if (upload.result) {
+                const analysisData = {
+                  upload_id: uploadId,
+                  filename: upload.file_metadata.filename,
+                  content_type: upload.file_metadata.content_type,
+                  size: upload.file_metadata.size,
+                  heatmap_urls: upload.result.heatmap_url,
+                  label_audio: upload.result.audio_analysis?.verdict || null,
+                  score_audio: upload.result.audio_analysis?.score_audio || null,
+                  label_video: upload.result.video_analysis?.predicted_class || null,
+                  score_video: upload.result.video_analysis?.score_video || null,
+                  label_image: upload.result.image_result?.label_image || null,
+                  score_image: upload.result.image_result?.score_image || null
+                };
+                navigate('/analysis', { state: analysisData });
+              }
+            }}
+            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="View Heatmap"
+            >
+            <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            </button>
+          )}
+          </div>
+          </td>
+          </motion.tr>
+        ))}
+        </tbody>
+        </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden w-full">
+        <div className="space-y-4 p-2 w-full">
+        {data.map((upload, index) => (
+          <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: index * 0.05 }}
+          key={index}
+          className="bg-gray-800/50 rounded-xl p-3 border border-gray-700/50 w-full overflow-x-auto"
+          >
+          {/* Filename */}
+          <div className="mb-3">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+          Filename
+          </div>
+          <div className="text-sm font-medium text-gray-300 break-all">
+          {upload.file_metadata.filename}
+          </div>
+          </div>
+
+          {/* File Status */}
+          <div className="mb-3">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+          File Status
+          </div>
+          <motion.span
+          whileHover={{ scale: 1.05 }}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
+            upload.file_status === 'complete'
+            ? 'bg-green-900/50 text-green-400'
+            : upload.file_status === 'pending'
+            ? 'bg-yellow-900/50 text-yellow-400'
+            : upload.file_status === 'processing'
+            ? 'bg-blue-900/50 text-blue-400'
+            : 'bg-red-900/50 text-red-400'
+          }`}
+          >
+          {upload.file_status}
+          </motion.span>
+          </div>
+
+          {/* Result */}
+          <div>
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+          Result
+          </div>
+          <div className="flex justify-between items-start gap-2">
+          <div className="flex-1">{formatResult(upload)}</div>
+          {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
+            <button
+            onClick={() => {
+              if (upload.result) {
+                const analysisData = {
+                  upload_id: uploadId,
+                  filename: upload.file_metadata.filename,
+                  content_type: upload.file_metadata.content_type,
+                  size: upload.file_metadata.size,
+                  heatmap_urls: upload.result.heatmap_url,
+                  label_audio: upload.result.audio_analysis?.verdict || null,
+                  score_audio: upload.result.audio_analysis?.score_audio || null,
+                  label_video: upload.result.video_analysis?.predicted_class || null,
+                  score_video: upload.result.video_analysis?.score_video || null,
+                  label_image: upload.result.image_result?.label_image || null,
+                  score_image: upload.result.image_result?.score_image || null
+                };
+                navigate('/analysis', { state: analysisData });
+              }
+            }}
+            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            aria-label="View Heatmap"
+            >
+            <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            </button>
+          )}
+          </div>
+          </div>
+          </motion.div>
+        ))}
+        </div>
+        </div>
+        </div>
+        </div>
+        </motion.div>
+      )}
+
+      {/* Heatmap Modal */}
+      {/* {selectedHeatmap && selectedHeatmap.result && (
+        // <AnalysisModal />
+        <Modal
+        isOpen={!!selectedHeatmap}
+        onClose={closeHeatmapModal}
+        images={selectedHeatmap.result.heatmap_url}
+        label_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.verdict || '' : ''}
+        score_audio={contentType === 'audio' || contentType === 'video' ? selectedHeatmap.result.audio_analysis?.score_audio || 0 : 0}
+        label_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.label_image || '') : ''}
+        score_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.score_image || 0) : 0}
+        label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.predicted_class || '') : ''}
+        score_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.score_video || 0) : 0}
+        />
+    )} */}
+    </>
+    )}
+    </div>
+    </div>
     </motion.div>
   );
 };
