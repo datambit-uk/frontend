@@ -343,12 +343,6 @@ const Report: React.FC = () => {
                           <th scope="col" className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             Status
                           </th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            Total Real
-                          </th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            Total Fake
-                          </th>
                           <th scope="col" className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             Date & Time
                           </th>
@@ -414,12 +408,6 @@ const Report: React.FC = () => {
                               >
                                 {entry.files_status.upload_status}
                               </motion.span>
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-green-400 font-bold text-center">
-                              {entry.files_status.upload_status === 'complete' && typeof entry.total_real !== 'undefined' ? entry.total_real : '-'}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-red-400 font-bold text-center">
-                              {entry.files_status.upload_status === 'complete' && typeof entry.total_fake !== 'undefined' ? entry.total_fake : '-'}
                             </td>
                             <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-300">
                               {formatDateTime(entry.created_at)}
