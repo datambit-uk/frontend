@@ -37,12 +37,11 @@ interface ReportResponse {
 
 const formatDateTime = (isoString: string) => {
   const date = new Date(isoString);
-  const localDateTime = date.toLocaleString();
   const gmtOffset = date.getTimezoneOffset();
   const gmtSign = gmtOffset > 0 ? '-' : '+';
   const gmtHours = Math.abs(Math.floor(gmtOffset / 60));
-  const gmtMinutes = Math.abs(gmtOffset % 60);
-  const gmtString = `GMT${gmtSign}${String(gmtHours).padStart(2, '0')}:${String(gmtMinutes).padStart(2, '0')}`;
+  const gmtString = `GMT${gmtSign}${String(gmtHours).padStart(2, '0')}`;
+  const localDateTime = date.toLocaleString();
   return `${localDateTime} (${gmtString})`;
 };
 
