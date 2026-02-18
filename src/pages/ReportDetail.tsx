@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, ReactElement } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// import Modal from '../components/HeatMap';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 
@@ -10,20 +9,56 @@ interface FileMetadata {
   size: number;
 }
 
+interface VideoAnalysis {
+  error: string | null;
+  verdict: string;
+  predicted_class: string;
+  fake_confidence: number;
+  real_confidence: number;
+  processing_time: number;
+  avg_inference_ms: number;
+  heatmap_paths?: string[] | null;
+  faces_detected?: number;
+  frames_analyzed?: number;
+  class_confidences?: Record<string, number>;
+  predicted_class_idx?: number;
+  score_video?: number;
+}
+
+interface AudioAnalysis {
+  error: string | null;
+  verdict: string;
+  fake_confidence: number;
+  real_confidence: number;
+  processing_time: number;
+  avg_inference_ms: number;
+  duration?: number;
+  audio_path?: string;
+  score_audio?: number;
+}
+
+interface ImageResult {
+  label_image: string;
+  score_image?: number;
+}
+
 interface Result {
-  audio_analysis: {
-    verdict: string;
-    error?: string; // Optional, as it might not always be present
-    score_audio?: number; // Optional, as it might not always be present
-  } | null;
-  image_result: any | null;
-  video_analysis: {
-    verdict: string;
-    predicted_class: string;
-    fake_confidence: number;
-    real_confidence: number;
-    score_video?: number; // Optional
-  } | null;
+  // Flat DB columns
+  id?: string;
+  file_upload_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  verdict?: string;
+  real_confidence?: number;
+  fake_confidence?: number;
+  heatmap_paths?: string[] | null;
+  predicted_class?: string | null;
+  processing_time?: number;
+  avg_inference_ms?: number;
+  // Nested analysis objects
+  video_analysis: VideoAnalysis | null;
+  audio_analysis: AudioAnalysis | null;
+  image_result: ImageResult | null;
   heatmap_url: string[] | null;
 }
 
@@ -68,19 +103,8 @@ const ReportDetail: React.FC = () => {
     }
   }, []);
 
-  // Setup polling if needed
-  const setupPolling = useCallback(() => {
-    if (hasProcessingItems && !pollingInterval.current) {
-      pollingInterval.current = setInterval(() => {
-        fetchReportDetail();
-      }, POLL_INTERVAL);
-    } else if (!hasProcessingItems) {
-      clearPolling();
-    }
-  }, [hasProcessingItems]);
-
-  const fetchReportDetail = async () => {
-    setLoading(state => state === false); // Only set loading true on initial fetch
+  const fetchReportDetail = useCallback(async () => {
+    setLoading(true); // Always set loading true on fetch start
     setError(null);
     try {
       const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
@@ -89,6 +113,7 @@ const ReportDetail: React.FC = () => {
         alert("Authentication token missing. Please log in again.");
         setData([]);
         setHasProcessingItems(false);
+        setLoading(false); // Set loading to false on error
         return;
       }
 
@@ -130,12 +155,15 @@ const ReportDetail: React.FC = () => {
 
           // For completed files, show them if they match the content type
           if (upload.file_status === 'complete') {
-            if (contentType === 'audio') {
-              return upload.file_metadata.content_type.toLowerCase() === 'audio';
-            } else if (contentType === 'image') {
-              return upload.file_metadata.content_type.toLowerCase() === 'image';
-            } else if (contentType === 'video') {
-              return upload.file_metadata.content_type.toLowerCase() === 'video';
+            const fileContentType = upload.file_metadata.content_type.toLowerCase();
+            if (contentType === 'audio' && fileContentType.includes('audio')) {
+              return true;
+            } else if (contentType === 'image' && fileContentType.includes('image')) {
+              return true;
+            } else if (contentType === 'video' && (fileContentType.includes('video') || fileContentType.includes('audio'))) { // Handle video files that might also have audio
+              return true;
+            } else if (contentType === undefined) { // If no specific content type is set, show all results that have some analysis
+              return upload.result?.audio_analysis || upload.result?.image_result || upload.result?.video_analysis;
             }
           }
           return false;
@@ -150,20 +178,32 @@ const ReportDetail: React.FC = () => {
         setData([]);
         setHasProcessingItems(false);
       }
-    } catch (err) {
+    } catch (err: unknown) { // Changed to unknown
       console.error(err);
+      setError(err instanceof Error ? err.message : "An unknown error occurred.");
       setData([]);
       setHasProcessingItems(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [uploadId, contentType, navigate, checkForProcessingItems]);
+
+  // Setup polling if needed
+  const setupPolling = useCallback(() => {
+    if (hasProcessingItems && !pollingInterval.current) {
+      pollingInterval.current = setInterval(() => {
+        fetchReportDetail();
+      }, POLL_INTERVAL);
+    } else if (!hasProcessingItems) {
+      clearPolling();
+    }
+  }, [hasProcessingItems, clearPolling, fetchReportDetail]);
 
   // Effect for initial fetch and cleanup
   useEffect(() => {
     fetchReportDetail();
     return () => clearPolling();
-  }, [uploadId, contentType]);
+  }, [uploadId, contentType, clearPolling, fetchReportDetail]); // Add fetchReportDetail to dependencies
 
   // Effect for polling setup
   useEffect(() => {
@@ -171,6 +211,7 @@ const ReportDetail: React.FC = () => {
     return () => clearPolling();
   }, [hasProcessingItems, setupPolling, clearPolling]);
 
+  // Moved outside the component
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
 
@@ -182,122 +223,144 @@ const ReportDetail: React.FC = () => {
   const formatResult = (upload: FileUpload) => {
     // Helper function to get label color
     const getLabelColor = (label: string | undefined | null) => {
-      if (!label) return 'text-gray-400'; // Return default color if label is undefined or null
+      if (!label) return 'text-gray-400';
       const lowerLabel = label.toLowerCase();
       if (lowerLabel === 'real') return 'text-green-400';
       if (lowerLabel === 'fake') return 'text-red-400';
       return 'text-gray-400';
     };
 
-    // Helper function to capitalize first character
     const capitalizeFirst = (str: string | undefined | null) => {
       if (!str) return '';
       return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
 
-    // If the file is in error state, display error info
+    const formatClassName = (cls: string | undefined | null) => {
+      if (!cls) return 'N/A';
+      return cls.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
+
     if (upload.file_status === 'error') {
       return (
         <div>
         <span className="font-semibold text-red-400">Error:</span>
         <br />
-        <span className="text-xs text-red-400">
-        Failed to process file
-        </span>
+        <span className="text-xs text-red-400">Failed to process file</span>
         </div>
       );
     }
 
-    // If the file is still processing, display file metadata instead of results
     if (upload.file_status === 'processing') {
       return (
         <div>
         <span className="font-semibold text-gray-300">File Info:</span>
         <br />
         <span className="text-xs text-gray-400">
-        Type: {upload.file_metadata.content_type},
-        Size: {formatFileSize(upload.file_metadata.size)}
+        Type: {upload.file_metadata.content_type}, Size: {formatFileSize(upload.file_metadata.size)}
         </span>
         </div>
       );
     }
 
-    // If file is complete but has no results (all result fields are null)
-    if (upload.file_status === 'complete' &&
+    if (
+      upload.file_status === 'complete' &&
       upload.result &&
       !upload.result.audio_analysis &&
       !upload.result.image_result &&
-      !upload.result.video_analysis) {
+      !upload.result.video_analysis
+    ) {
       return (
         <div>
         <span className="font-semibold text-red-400">Error:</span>
         <br />
-        <span className="text-xs text-red-400">
-        No results available - Processing failed
-        </span>
+        <span className="text-xs text-red-400">No results available - Processing failed</span>
         </div>
       );
+    }
+
+    if (upload.file_status === 'complete') {
+      const results: ReactElement[] = [];
+
+      // Image Analysis
+      if (upload.result?.image_result && upload.file_metadata.content_type.toLowerCase().includes('image')) {
+        results.push(
+          <div key="image-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+          <h4 className="text-sm font-semibold text-gray-300 mb-1">Image Analysis:</h4>
+          <p className="text-xs text-gray-400">
+          Verdict:{' '}
+          <span className={getLabelColor(upload.result.image_result.label_image)}>
+          {capitalizeFirst(upload.result.image_result.label_image)}
+          </span>
+          </p>
+          </div>
+        );
       }
 
-      // If file is complete with results, display results as before
-      if (upload.file_status === 'complete') {
-        if (contentType === 'audio') {
-          return (
-            <div>
-            <span className="text-gray-400">
-            {upload.result?.audio_analysis ?
-              `Label: ` : 'No score detected'}
-              {upload.result?.audio_analysis && (
-                <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
-                {capitalizeFirst(upload.result.audio_analysis.verdict)}
-                </span>
-              )}
-              {upload.result?.audio_analysis?.score_audio !== undefined }
-              </span>          </div>
-          );
-        } else if (contentType === 'image') {
-          return (
-            <div>
-            <span className="text-gray-400">
-            {upload.result?.image_result ?
-              `Label: ` : 'No attachment detected'}
-              {upload.result?.image_result && (
-                <span className={getLabelColor(upload.result.image_result.label_image)}>
-                {capitalizeFirst(upload.result.image_result.label_image)}
-                </span>
-              )}
-              {upload.result?.image_result }
-              </span>
-              </div>
-          );
-        } else if (contentType === 'video') {
-          const results = [];
-          if (upload.result?.audio_analysis) {
-            results.push(
-              <div key="audio" className="text-gray-400">
-              Audio - Label: <span className={getLabelColor(upload.result.audio_analysis.verdict)}>
-              {capitalizeFirst(upload.result.audio_analysis.verdict)}
-              </span>
-              {upload.result.audio_analysis.verdict !== 'NO_AUDIO' && upload.result.audio_analysis.score_audio !== undefined }
-              </div>
-            );
-          }
-          if (upload.result?.video_analysis) {
-            results.push(
-              <div key="video" className="text-gray-400">
-              Video - Label: <span className={getLabelColor(upload.result.video_analysis.verdict)}>
-              {capitalizeFirst(upload.result.video_analysis.verdict)}
-              </span>
-              </div>
-            );
-          }        return (
-            <div>
-            {results.length > 0 ? results : <span className="text-gray-400">No issues detected</span>}
-            </div>
-          );
-        }
+      // Video + Audio: show video_analysis fields including predicted_class
+      const isVideo = upload.file_metadata.content_type.toLowerCase().includes('video');
+      const hasVideoAnalysis = isVideo && upload.result?.video_analysis;
+      const hasAudioAnalysis = upload.result?.audio_analysis;
+
+      if (hasVideoAnalysis) {
+        const v = upload.result!.video_analysis!;
+        results.push(
+          <div key="video-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+          <h4 className="text-sm font-semibold text-blue-300 mb-1">Video Analysis:</h4>
+          <p className="text-xs text-gray-400">
+          Verdict:{' '}
+          <span className={getLabelColor(v.verdict)}>{capitalizeFirst(v.verdict)}</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Predicted Class: <span className="text-gray-300">{formatClassName(v.predicted_class)}</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Fake Confidence: <span className="text-red-300">{(v.fake_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Real Confidence: <span className="text-green-300">{(v.real_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Processing Time: <span className="text-gray-300">{v.processing_time?.toFixed(2) ?? 'N/A'}s</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Avg Inference: <span className="text-gray-300">{v.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+          </p>
+          </div>
+        );
       }
-      return <span className="text-gray-400">-</span>;
+
+      // Audio Analysis — shown for both audio-only and video+audio (no predicted_class for audio)
+      if (hasAudioAnalysis) {
+        const a = upload.result!.audio_analysis!;
+        results.push(
+          <div key="audio-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+          <h4 className="text-sm font-semibold text-purple-300 mb-1">Audio Analysis:</h4>
+          <p className="text-xs text-gray-400">
+          Verdict:{' '}
+          <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Fake Confidence: <span className="text-red-300">{(a.fake_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Real Confidence: <span className="text-green-300">{(a.real_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+          </p>
+          </div>
+        );
+      }
+
+      return (
+        <div>{results.length > 0 ? results : <span>No issues detected</span>}</div>
+      );
+    }
+
+    return <span>-</span>;
   };
 
   // Calculate summary stats
@@ -320,7 +383,7 @@ const ReportDetail: React.FC = () => {
           if (result.video_analysis.verdict.toLowerCase() === "real") totalReal++;
           if (result.video_analysis.verdict.toLowerCase() === "fake") totalFake++;
         }
-      } // Closing curly brace for 'if (result)'
+      }
     });
   }
 
@@ -346,7 +409,7 @@ const ReportDetail: React.FC = () => {
       {/* Upload ID left */}
       <div className="flex flex-col items-start min-w-[120px] flex-1">
       <span className="text-xs text-gray-400">Upload ID</span>
-      <span className="text-lg font-bold font-mono text-blue-300 break-all max-w-[320px] tracking-wide leading-tight select-all">
+      <span className="text-lg font-bold font-mono text-blue-400 break-all max-w-[320px] tracking-wide leading-tight select-all">
       {uploadId}
       </span>
       </div>
@@ -484,7 +547,7 @@ const ReportDetail: React.FC = () => {
                   heatmap_urls: upload.result.heatmap_url,
                   label_audio: upload.result.audio_analysis?.verdict || null,
                   score_audio: upload.result.audio_analysis?.score_audio || null,
-                  label_video: upload.result.video_analysis?.predicted_class || null,
+                  label_video: upload.result.video_analysis?.verdict || null, // Changed from predicted_class to verdict
                   score_video: upload.result.video_analysis?.score_video || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
@@ -575,7 +638,7 @@ const ReportDetail: React.FC = () => {
                   heatmap_urls: upload.result.heatmap_url,
                   label_audio: upload.result.audio_analysis?.verdict || null,
                   score_audio: upload.result.audio_analysis?.score_audio || null,
-                  label_video: upload.result.video_analysis?.predicted_class || null,
+                  label_video: upload.result.video_analysis?.verdict || null,
                   score_video: upload.result.video_analysis?.score_video || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
@@ -620,7 +683,7 @@ const ReportDetail: React.FC = () => {
         label_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.label_image || '') : ''}
         score_image={contentType === 'image' ? (selectedHeatmap.result.image_result?.score_image || 0) : 0}
         label_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.predicted_class || '') : ''}
-        score_video={contentType === 'video' ? (selectedHeatmap.result.video_analysis?.score_video || 0) : 0}
+        score_video={contentType === 'video' ? (selectedHeathetmap.result.video_analysis?.score_video || 0) : 0}
         />
     )} */}
     </>
