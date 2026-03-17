@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, LifeBuoy, LogOut, Clock, FolderOpen } from "lucide-react"; 
+import { Home, LifeBuoy, LogOut, Clock, FolderOpen, BarChart3, Shield } from "lucide-react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -11,13 +11,39 @@ const navItems = [
   { label: "Home", path: "/home", icon: <Home className="w-6 h-6" /> },
   { label: "Recent Upload", path: "/recent-upload", icon: <Clock className="w-6 h-6" /> },
   { label: "All Uploads", path: "/all-uploads", icon: <FolderOpen className="w-6 h-6" /> },
+  { label: "Usage", path: "/usage", icon: <BarChart3 className="w-6 h-6" /> },
   { label: "Support", path: "/support", icon: <LifeBuoy className="w-6 h-6" /> },
-  // { label: "Get Started", path: "/get-started", icon: <Rocket className="w-6 h-6" /> },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const isAdmin = useMemo(() => {
+    try {
+      const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
+      if (!token) return false;
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const payload = JSON.parse(jsonPayload);
+      const sub = JSON.parse(payload.sub);
+      return sub.role === 4;
+    } catch (e) {
+      return false;
+    }
+  }, []);
+
+  const visibleNavItems = useMemo(() => {
+    const items = [...navItems];
+    if (isAdmin) {
+      items.push({ label: "Admin", path: "/group-management", icon: <Shield className="w-6 h-6" /> });
+    }
+    return items;
+  }, [isAdmin]);
 
   return (
     <aside
@@ -47,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
 
       {/* Navigation Items */}
       <nav className="flex-1 px-4 py-6 space-y-2">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}

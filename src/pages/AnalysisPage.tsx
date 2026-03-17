@@ -39,6 +39,8 @@ const AnalysisPage: React.FC = () => {
         score_audio: analysisData.score_audio || null,
         label_video: analysisData.label_video || null,
         score_video: analysisData.score_video || null,
+        label_metadata: analysisData.label_metadata || null,
+        score_metadata: analysisData.score_metadata || null,
         label_image: analysisData.label_image || null,
         score_image: analysisData.score_image || null
     };
@@ -329,6 +331,36 @@ const AnalysisPage: React.FC = () => {
                                         ) : (
                                             <div className="text-center py-4">
                                                 <span className="text-gray-400 text-sm">Not available</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Metadata Analysis */}
+                            {meta.label_metadata && (
+                                <div className="bg-gradient-to-br from-gray-700/50 to-gray-800/50 border border-gray-600/30 rounded-xl p-4 shadow-lg backdrop-blur-sm">
+                                    <div className="flex items-center mb-3">
+                                        <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></div>
+                                        <h3 className="font-bold text-gray-200 text-lg">Metadata Analysis</h3>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-400">Label:</span>
+                                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                                meta.label_metadata.toLowerCase() === 'real' 
+                                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                            }`}>
+                                                {meta.label_metadata.charAt(0).toUpperCase() + meta.label_metadata.slice(1)}
+                                            </span>
+                                        </div>
+                                        {meta.score_metadata !== null && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-400">Confidence Score:</span>
+                                                <span className="text-white font-mono bg-gray-700/50 px-2 py-1 rounded">
+                                                    {meta.score_metadata}
+                                                </span>
                                             </div>
                                         )}
                                     </div>

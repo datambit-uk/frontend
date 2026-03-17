@@ -37,6 +37,16 @@ interface AudioAnalysis {
   score_audio?: number;
 }
 
+interface MetadataAnalysis {
+  error: string | null;
+  verdict: string;
+  fake_confidence: number;
+  real_confidence: number;
+  processing_time: number;
+  avg_inference_ms: number;
+  score_metadata?: number;
+}
+
 interface ImageResult {
   label_image: string;
   score_image?: number;
@@ -58,6 +68,7 @@ interface Result {
   // Nested analysis objects
   video_analysis: VideoAnalysis | null;
   audio_analysis: AudioAnalysis | null;
+  metadata_analysis: MetadataAnalysis | null;
   image_result: ImageResult | null;
   heatmap_url: string[] | null;
 }
@@ -355,6 +366,32 @@ const ReportDetail: React.FC = () => {
         );
       }
 
+      // Metadata Analysis
+      if (upload.result?.metadata_analysis) {
+        const m = upload.result!.metadata_analysis!;
+        results.push(
+          <div key="metadata-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+          <h4 className="text-sm font-semibold text-green-300 mb-1">Metadata Analysis:</h4>
+          <p className="text-xs text-gray-400">
+          Verdict:{' '}
+          <span className={getLabelColor(m.verdict)}>{capitalizeFirst(m.verdict)}</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Fake Confidence: <span className="text-red-300">{(m.fake_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Real Confidence: <span className="text-green-300">{(m.real_confidence * 100).toFixed(2)}%</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Processing Time: <span className="text-gray-300">{m.processing_time?.toFixed(2) ?? 'N/A'}s</span>
+          </p>
+          <p className="text-xs text-gray-400">
+          Avg Inference: <span className="text-gray-300">{m.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+          </p>
+          </div>
+        );
+      }
+
       return (
         <div>{results.length > 0 ? results : <span>No issues detected</span>}</div>
       );
@@ -549,6 +586,8 @@ const ReportDetail: React.FC = () => {
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null, // Changed from predicted_class to verdict
                   score_video: upload.result.video_analysis?.score_video || null,
+                  label_metadata: upload.result.metadata_analysis?.verdict || null,
+                  score_metadata: upload.result.metadata_analysis?.score_metadata || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
                 };
@@ -640,6 +679,8 @@ const ReportDetail: React.FC = () => {
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null,
                   score_video: upload.result.video_analysis?.score_video || null,
+                  label_metadata: upload.result.metadata_analysis?.verdict || null,
+                  score_metadata: upload.result.metadata_analysis?.score_metadata || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
                 };

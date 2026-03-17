@@ -16,6 +16,8 @@ const Dropbox: React.FC<DropboxProps> = ({ mediaType, onFilesAdded, currentFileC
         return "audio/*";
       case "Video":
         return "video/*";
+      case "Media":
+        return "audio/*,video/*";
       case "Image":
         return "image/*";
       default:
@@ -33,6 +35,7 @@ const Dropbox: React.FC<DropboxProps> = ({ mediaType, onFilesAdded, currentFileC
       if (
         (mediaType === "Audio" && fileType === "audio") ||
         (mediaType === "Video" && fileType === "video") ||
+        (mediaType === "Media" && (fileType === "audio" || fileType === "video")) ||
         (mediaType === "Image" && fileType === "image")
       ) {
         filteredFiles.push(file);
@@ -40,13 +43,15 @@ const Dropbox: React.FC<DropboxProps> = ({ mediaType, onFilesAdded, currentFileC
     });
     
     if (filteredFiles.length === 0) {
-      alert(`Please select ${mediaType?.toLowerCase()} files only.`);
+      const typeLabel = mediaType === "Media" ? "audio or video" : mediaType?.toLowerCase();
+      alert(`Please select ${typeLabel} files only.`);
       return;
     }
     
     // Check if adding these files would exceed the limit
     if (currentFileCount + filteredFiles.length > 50) {
-      alert(`You can only upload a maximum of 50 ${mediaType?.toLowerCase()} files. Currently at ${currentFileCount}.`);
+      const typeLabel = mediaType === "Media" ? "audio or video" : mediaType?.toLowerCase();
+      alert(`You can only upload a maximum of 50 ${typeLabel} files. Currently at ${currentFileCount}.`);
       return;
     }
     
@@ -91,7 +96,7 @@ const Dropbox: React.FC<DropboxProps> = ({ mediaType, onFilesAdded, currentFileC
       onClick={() => document.getElementById("fileInput")?.click()}
     >
       <UploadCloud className="w-12 h-12 text-blue-400 mb-4 transform transition-transform group-hover:scale-110" />
-      <p className="text-md font-medium text-gray-200">Drag & drop {mediaType} here</p>
+      <p className="text-md font-medium text-gray-200">Drag & drop {mediaType === "Media" ? "Video/Audio" : mediaType} here</p>
       <p className="text-sm text-gray-400 mt-1">or click to browse</p>
       <p className="text-sm text-gray-400 mt-4">
         {currentFileCount}/50 files selected

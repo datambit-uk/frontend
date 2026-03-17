@@ -13,6 +13,8 @@ import NotFoundPage from '../pages/NotFoundPage';
 import SupportPage from '../pages/SupportPage';
 import AnalysisPage from '../pages/AnalysisPage';
 import RecentFileUploads from '../pages/RecentFileUploads';
+import UsageDashboard from '../pages/UsageDashboard';
+import GroupManagement from '../pages/GroupManagement';
 
 const AppRouter: React.FC = () => {
   return (
@@ -40,6 +42,8 @@ const AppRouter: React.FC = () => {
             <Route path="report/:uploadId/:contentType" element={<ReportDetail />} />
             <Route path="support" element={<SupportPage />} />
             <Route path="analysis" element={<AnalysisPage/>}/>
+            <Route path="usage" element={<UsageDashboard />} />
+            <Route path="group-management" element={<GroupManagement />} />
           </Route>
 
           {/* 404 Route - This will catch all unmatched routes */}

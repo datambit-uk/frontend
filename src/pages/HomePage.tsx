@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // import SearchBar from "../components/SearchBar";
-import { AudioLines, Video, Image as ImageIcon, Copy, Check, X } from "lucide-react";
+import { Video, Copy, Check, X } from "lucide-react";
 import MediaCard from "../components/MediaCard";
 import Dropbox from "../components/Dropbox";
 
@@ -18,6 +18,7 @@ const Home: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [generateHeatmap, setGenerateHeatmap] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dropboxKey, setDropboxKey] = useState(0);
   const [responseMessage, setResponseMessage] = useState<{ 
@@ -120,7 +121,15 @@ const Home: React.FC = () => {
     }
 
     files.forEach(file => formData.append('files', file));
-    const mediaType = selectedCard.toLowerCase();
+    
+    // Determine media type for routing
+    let mediaType = selectedCard.toLowerCase();
+    if (mediaType === "media") {
+      // If we have any video files, route to video service
+      const hasVideo = files.some(file => file.type.startsWith('video/'));
+      mediaType = hasVideo ? "video" : "audio";
+    }
+
     const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
 
     if (!token) {
@@ -230,7 +239,11 @@ const Home: React.FC = () => {
     resetNoProgressTimer(); // Start the initial no-progress timer
 
     try {
-      xhr.open("POST", `${API_URL}/api/v1/${mediaType}/upload`, true);
+      let uploadUrl = `${API_URL}/api/v1/${mediaType}/upload`;
+      if (generateHeatmap) {
+        uploadUrl += `?generate-heatmaps=true`;
+      }
+      xhr.open("POST", uploadUrl, true);
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.send(formData);
     } catch (error) {
@@ -252,24 +265,12 @@ const Home: React.FC = () => {
         setSearchQuery={setSearchQuery}
         onSearchClick={handleSearchClick}
       /> */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <MediaCard
-          icon={<AudioLines className="w-8 h-8 text-blue-400" />}
-          label="Upload Audio"
-          onClick={() => handleMediaClick("Audio")}
-          isSelected={selectedCard === "Audio"}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <MediaCard
           icon={<Video className="w-8 h-8 text-blue-400" />}
-          label="Upload Video"
-          onClick={() => handleMediaClick("Video")}
-          isSelected={selectedCard === "Video"}
-        />
-        <MediaCard
-          icon={<ImageIcon className="w-8 h-8 text-blue-400" />}
-          label="Upload Image"
-          onClick={() => handleMediaClick("Image")}
-          isSelected={selectedCard === "Image"}
+          label="Upload Video/Audio"
+          onClick={() => handleMediaClick("Media")}
+          isSelected={selectedCard === "Media"}
         />
       </div>
 
@@ -283,7 +284,20 @@ const Home: React.FC = () => {
           />
           
           {files.length > 0 && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="generate-heatmap"
+                  checked={generateHeatmap}
+                  onChange={(e) => setGenerateHeatmap(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+                />
+                <label htmlFor="generate-heatmap" className="text-sm font-medium text-gray-300 cursor-pointer">
+                  Generate-Heatmap
+                </label>
+              </div>
+
               <p className="text-sm text-gray-400">
                 {files.length} file(s) selected
               </p>
@@ -297,7 +311,7 @@ const Home: React.FC = () => {
                   onClick={uploadFiles}
                   disabled={isUploading}
                 >
-                  {isUploading ? `Uploading ${selectedCard} Files...` : `Upload ${selectedCard} Files`}
+                  {isUploading ? `Uploading ${selectedCard === "Media" ? "Media" : selectedCard} Files...` : `Upload ${selectedCard === "Media" ? "Media" : selectedCard} Files`}
                 </button>
               </div>
             </div>
