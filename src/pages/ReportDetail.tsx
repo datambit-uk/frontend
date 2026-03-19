@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, ReactElement } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
@@ -23,6 +23,7 @@ interface VideoAnalysis {
   class_confidences?: Record<string, number>;
   predicted_class_idx?: number;
   score_video?: number;
+  num_windows?: number;
 }
 
 interface AudioAnalysis {
@@ -35,16 +36,6 @@ interface AudioAnalysis {
   duration?: number;
   audio_path?: string;
   score_audio?: number;
-}
-
-interface MetadataAnalysis {
-  error: string | null;
-  verdict: string;
-  fake_confidence: number;
-  real_confidence: number;
-  processing_time: number;
-  avg_inference_ms: number;
-  score_metadata?: number;
 }
 
 interface ImageResult {
@@ -68,12 +59,13 @@ interface Result {
   // Nested analysis objects
   video_analysis: VideoAnalysis | null;
   audio_analysis: AudioAnalysis | null;
-  metadata_analysis: MetadataAnalysis | null;
   image_result: ImageResult | null;
   heatmap_url: string[] | null;
+  metadata_analysis: any | null;
 }
 
 interface FileUpload {
+  file_meta_id?: string;
   file_metadata: FileMetadata;
   file_status: string;
   result: Result | null;
@@ -86,10 +78,230 @@ interface ReportDetailResponse {
   };
 }
 
+const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  if (!data) return null;
+
+  const verdict = data.verdict || 'UNKNOWN';
+  const score = data.score !== undefined ? data.score : (data.suspicious_score !== undefined ? data.suspicious_score : 'N/A');
+
+  return (
+    <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm">
+    <div className="flex justify-between items-center mb-2">
+    <h4 className="text-xs font-bold text-green-400 uppercase tracking-wider">Metadata Analysis</h4>
+    <button
+    onClick={() => setIsExpanded(!isExpanded)}
+    className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-1 rounded border border-gray-700 transition-all flex items-center gap-1"
+    >
+    {isExpanded ? (
+      <>
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+      Hide
+      </>
+    ) : (
+      <>
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+      Show Full Analysis
+      </>
+    )}
+    </button>
+    </div>
+
+    <div className="space-y-2">
+    <div className="flex items-center gap-2">
+    <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict === 'SUSPICIOUS' ? 'bg-yellow-900/40 text-yellow-400' : 'bg-green-900/40 text-green-400'}`}>
+    {verdict}
+    </span>
+    <span className="text-[10px] text-gray-400 font-mono">Score: {typeof score === 'number' ? score.toFixed(4) : score}</span>
+    </div>
+
+    {data.source_analysis && (
+      <div className="flex items-center gap-1 text-[10px] text-gray-400">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      Likely Source: <span className="text-gray-200 font-medium">{data.source_analysis.likely_source}</span>
+      <span className="opacity-60">(Conf: {data.source_analysis.confidence?.toFixed(2)})</span>
+      </div>
+    )}
+
+    {data.anomalies && data.anomalies.length > 0 && (
+      <div className="text-[10px] bg-yellow-900/10 border border-yellow-700/20 rounded p-1.5">
+      <div className="flex items-center gap-1 text-yellow-500 font-bold mb-1 uppercase text-[9px]">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      Detected Anomalies ({data.anomalies.length})
+      </div>
+      <ul className="list-disc list-inside text-gray-400 space-y-0.5">
+      {data.anomalies.slice(0, isExpanded ? undefined : 2).map((a: string, i: number) => (
+        <li key={i} className="leading-tight">{a}</li>
+      ))}
+      {!isExpanded && data.anomalies.length > 2 && <li className="list-none text-blue-400 mt-0.5 font-medium">+ {data.anomalies.length - 2} more...</li>}
+      </ul>
+      </div>
+    )}
+    </div>
+
+    {isExpanded && (
+      <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
+      >
+      {data.file_info && (
+        <div className="bg-black/20 p-2 rounded">
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1.5 border-b border-gray-800 pb-1">File Information</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+        <div className="flex justify-between border-b border-gray-800/50 pb-0.5">
+        <span className="text-gray-500">Size</span>
+        <span className="text-gray-300 font-mono">{data.file_info.size}</span>
+        </div>
+        <div className="flex justify-between border-b border-gray-800/50 pb-0.5">
+        <span className="text-gray-500">Type</span>
+        <span className="text-gray-300 font-mono">{data.file_info.type}</span>
+        </div>
+        <div className="col-span-2 flex flex-col gap-0.5">
+        <span className="text-gray-500">File Hash (SHA-256)</span>
+        <span className="text-gray-400 font-mono break-all bg-black/40 p-1 rounded select-all">{data.file_info.hash}</span>
+        </div>
+        </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      {data.matrix_structure && (
+        <div className="bg-black/20 p-2 rounded">
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Matrix Structure</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.matrix_structure}</p>
+        </div>
+      )}
+      {data.bitrate_analysis && (
+        <div className="bg-black/20 p-2 rounded">
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Bitrate Analysis</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.bitrate_analysis}</p>
+        </div>
+      )}
+      {data.frame_rate && (
+        <div className="bg-black/20 p-2 rounded">
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Frame Rate</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.frame_rate}</p>
+        </div>
+      )}
+      </div>
+
+      {data.hex_analysis && (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Hex Analysis</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
+        {JSON.stringify(data.hex_analysis, null, 2)}
+        </pre>
+        </div>
+      )}
+
+      {data.ffprobe && (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">FFprobe (stream & format)</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
+        {JSON.stringify(data.ffprobe, null, 2)}
+        </pre>
+        </div>
+      )}
+
+      {data.quantization_analysis && (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Quantization Analysis</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded font-mono leading-tight">
+        {JSON.stringify(data.quantization_analysis, null, 2)}
+        </pre>
+        </div>
+      )}
+
+      {(data.atom_structure || data.atom_tree || data.atoms) && (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Moov / Atom structure</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
+        {JSON.stringify(data.atom_structure || data.atom_tree || data.atoms, null, 2)}
+        </pre>
+        </div>
+      )}
+
+      {data.metadata_inconsistencies && data.metadata_inconsistencies.length > 0 && (
+        <div className="bg-red-900/10 border border-red-700/20 rounded p-2">
+        <p className="text-[9px] font-black text-red-400 uppercase mb-1.5 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Metadata inconsistencies
+        </p>
+        <ul className="list-disc list-inside text-[10px] text-red-400/80 space-y-1">
+        {data.metadata_inconsistencies.map((err: string, i: number) => <li key={i}>{err}</li>)}
+        </ul>
+        </div>
+      )}
+      </motion.div>
+    )}
+    </div>
+  );
+};
+
+const HeatmapSection: React.FC<{ urls: string[] | null | undefined }> = ({ urls }) => {
+  if (!urls || urls.length === 0) return null;
+
+  return (
+    <div className="mt-4 pt-3 border-t border-gray-700/50">
+    <div className="flex items-center gap-2 mb-3">
+    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Forensic Heatmaps</h4>
+    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">AI Visual Evidence</span>
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {urls.map((url, i) => {
+      const isVideo = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.webm') || url.includes('video');
+      return (
+        <div key={i} className="relative group bg-black/40 rounded-xl overflow-hidden border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-2xl">
+        {isVideo ? (
+          <video
+          src={url}
+          controls
+          className="w-full aspect-video object-cover"
+          muted
+          loop
+          />
+        ) : (
+          <img src={url} alt={`Forensic analysis ${i+1}`} className="w-full aspect-video object-cover" />
+        )}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="p-1.5 bg-gray-900/90 rounded-lg text-blue-400 hover:text-blue-300 border border-gray-700 shadow-xl"
+        title="Open original"
+        >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        </a>
+        </div>
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+        <span className="text-[9px] text-gray-300 font-medium truncate block">Source: forensic_node_{i+1}</span>
+        </div>
+        </div>
+      );
+    })}
+    </div>
+    </div>
+  );
+};
+
 const ReportDetail: React.FC = () => {
   const { uploadId, contentType: urlContentType } = useParams<{ uploadId: string; contentType?: string }>();
   const [data, setData] = useState<FileUpload[]>([]);
-  const [contentType, setContentType] = useState<string | undefined>(urlContentType);
+  const [contentType] = useState<string | undefined>(urlContentType);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasProcessingItems, setHasProcessingItems] = useState<boolean>(false);
@@ -103,7 +315,7 @@ const ReportDetail: React.FC = () => {
 
   // Check if any items are in processing state
   const checkForProcessingItems = useCallback((items: FileUpload[]) => {
-    return items.some(item => item.file_status === 'processing');
+    return items.some(item => item.file_status === 'processing' || item.file_status === 'pending');
   }, []);
 
   // Clear polling interval
@@ -139,43 +351,25 @@ const ReportDetail: React.FC = () => {
 
 
       if (result.code === 'success' && result.message && Array.isArray(result.message.file_uploads) && result.message.file_uploads.length > 0) {
-        // If no content type is provided in URL, determine it from the first file with results
-        if (!contentType) {
-          const fileWithResults = result.message.file_uploads.find(upload => {
-            if (upload.result) {
-              if (upload.result.audio_analysis !== null) return true;
-              if (upload.result.image_result !== null) return true;
-              if (upload.result.video_analysis !== null) return true;
-            }
-            return false;
-          });
-
-          if (fileWithResults) {
-            const newContentType = fileWithResults.file_metadata.content_type.toLowerCase();
-            setContentType(newContentType);
-            // Update URL without reloading
-            navigate(`/report/${uploadId}/${newContentType}`, { replace: true });
-          }
-        }
-
+        // Show all uploads — pending/processing show a status card, complete show results
         const filteredUploads = result.message.file_uploads.filter(upload => {
-          // Always show files that are processing or have errors
-          if (upload.file_status === 'processing' || upload.file_status === 'error') {
+          // Always show pending, processing, or errored files
+          if (
+            upload.file_status === 'pending' ||
+            upload.file_status === 'processing' ||
+            upload.file_status === 'error'
+          ) {
             return true;
           }
 
-          // For completed files, show them if they match the content type
+          // For completed files, show if they have any analysis result
           if (upload.file_status === 'complete') {
-            const fileContentType = upload.file_metadata.content_type.toLowerCase();
-            if (contentType === 'audio' && fileContentType.includes('audio')) {
-              return true;
-            } else if (contentType === 'image' && fileContentType.includes('image')) {
-              return true;
-            } else if (contentType === 'video' && (fileContentType.includes('video') || fileContentType.includes('audio'))) { // Handle video files that might also have audio
-              return true;
-            } else if (contentType === undefined) { // If no specific content type is set, show all results that have some analysis
-              return upload.result?.audio_analysis || upload.result?.image_result || upload.result?.video_analysis;
-            }
+            return !!(
+              upload.result?.audio_analysis ||
+              upload.result?.image_result ||
+              upload.result?.video_analysis
+            );
+
           }
           return false;
         });
@@ -261,14 +455,23 @@ const ReportDetail: React.FC = () => {
       );
     }
 
-    if (upload.file_status === 'processing') {
+    if (upload.file_status === 'pending' || upload.file_status === 'processing') {
+      const isPending = upload.file_status === 'pending';
       return (
-        <div>
-        <span className="font-semibold text-gray-300">File Info:</span>
-        <br />
-        <span className="text-xs text-gray-400">
-        Type: {upload.file_metadata.content_type}, Size: {formatFileSize(upload.file_metadata.size)}
+        <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+        <svg className="animate-spin h-4 w-4 text-blue-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-sm font-semibold text-blue-300">
+        {isPending ? 'Pending — queued for processing' : 'Processing — analysis in progress'}
         </span>
+        </div>
+        <span className="text-xs text-gray-500">
+        {upload.file_metadata.content_type} &bull; {formatFileSize(upload.file_metadata.size)}
+        </span>
+        <span className="text-[10px] text-gray-600 italic">This page will refresh automatically.</span>
         </div>
       );
     }
@@ -290,13 +493,11 @@ const ReportDetail: React.FC = () => {
     }
 
     if (upload.file_status === 'complete') {
-      const results: ReactElement[] = [];
-
-      // Image Analysis
+      // Image Analysis (standalone, no grid needed)
       if (upload.result?.image_result && upload.file_metadata.content_type.toLowerCase().includes('image')) {
-        results.push(
-          <div key="image-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
-          <h4 className="text-sm font-semibold text-gray-300 mb-1">Image Analysis:</h4>
+        return (
+          <div className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
+          <h4 className="text-sm font-semibold text-orange-300 mb-1">Image Analysis</h4>
           <p className="text-xs text-gray-400">
           Verdict:{' '}
           <span className={getLabelColor(upload.result.image_result.label_image)}>
@@ -307,15 +508,23 @@ const ReportDetail: React.FC = () => {
         );
       }
 
-      // Video + Audio: show video_analysis fields including predicted_class
       const isVideo = upload.file_metadata.content_type.toLowerCase().includes('video');
       const hasVideoAnalysis = isVideo && upload.result?.video_analysis;
       const hasAudioAnalysis = upload.result?.audio_analysis;
 
+      let videoBlock: React.ReactElement | null = null;
+      let audioBlock: React.ReactElement | null = null;
+
       if (hasVideoAnalysis) {
         const v = upload.result!.video_analysis!;
-        results.push(
-          <div key="video-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+        const syntheticScore = (v.class_confidences && typeof v.class_confidences === 'object')
+        ? Object.entries(v.class_confidences)
+        .filter(([cls]) => cls.toLowerCase() !== 'real')
+        .reduce((sum, [_, score]) => sum + (score as number), 0)
+        : v.fake_confidence;
+
+        videoBlock = (
+          <div key="video-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
           <h4 className="text-sm font-semibold text-blue-300 mb-1">Video Analysis:</h4>
           <p className="text-xs text-gray-400">
           Verdict:{' '}
@@ -325,7 +534,7 @@ const ReportDetail: React.FC = () => {
           Predicted Class: <span className="text-gray-300">{formatClassName(v.predicted_class)}</span>
           </p>
           <p className="text-xs text-gray-400">
-          Fake Confidence: <span className="text-red-300">{(v.fake_confidence * 100).toFixed(2)}%</span>
+          Synthetic Score: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
           </p>
           <p className="text-xs text-gray-400">
           Real Confidence: <span className="text-green-300">{(v.real_confidence * 100).toFixed(2)}%</span>
@@ -336,6 +545,16 @@ const ReportDetail: React.FC = () => {
           <p className="text-xs text-gray-400">
           Avg Inference: <span className="text-gray-300">{v.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
           </p>
+          {v.frames_analyzed !== undefined && (
+            <p className="text-xs text-gray-400">
+            Frames Analyzed: <span className="text-gray-300">{v.frames_analyzed}</span>
+            </p>
+          )}
+          {v.num_windows !== undefined && (
+            <p className="text-xs text-gray-400">
+            Windows: <span className="text-gray-300">{v.num_windows}</span>
+            </p>
+          )}
           </div>
         );
       }
@@ -343,57 +562,91 @@ const ReportDetail: React.FC = () => {
       // Audio Analysis — shown for both audio-only and video+audio (no predicted_class for audio)
       if (hasAudioAnalysis) {
         const a = upload.result!.audio_analysis!;
-        results.push(
-          <div key="audio-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
+        const syntheticScore = (a as any).fake_confidence; // Audio usually only has real/fake
+
+        const isNoSpeech = a.verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
+
+        audioBlock = (
+          <div key="audio-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
           <h4 className="text-sm font-semibold text-purple-300 mb-1">Audio Analysis:</h4>
-          <p className="text-xs text-gray-400">
-          Verdict:{' '}
-          <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Fake Confidence: <span className="text-red-300">{(a.fake_confidence * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Real Confidence: <span className="text-green-300">{(a.real_confidence * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
-          </p>
+
+          {isNoSpeech ? (
+            <>
+            <p className="text-xs text-gray-400">
+            Verdict:{' '}
+            <span className="text-yellow-400">No Speech Detected</span>
+            </p>
+            <p className="text-xs text-yellow-600 mt-1">
+            The audio track contains no detectable speech and could not be analysed. The file may be silent or contain only background noise.
+            </p>
+            {a.processing_time !== undefined && (
+              <p className="text-xs text-gray-400 mt-1">
+              Processing Time: <span className="text-gray-300">{a.processing_time.toFixed(2)}s</span>
+              </p>
+            )}
+            </>
+          ) : (
+            <>
+            <p className="text-xs text-gray-400">
+            Verdict:{' '}
+            <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
+            </p>
+            <p className="text-xs text-gray-400">
+            Synthetic Score: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
+            </p>
+            <p className="text-xs text-gray-400">
+            Real Confidence: <span className="text-green-300">{(a.real_confidence * 100).toFixed(2)}%</span>
+            </p>
+            <p className="text-xs text-gray-400">
+            Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
+            </p>
+            <p className="text-xs text-gray-400">
+            Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+            </p>
+            {a.duration !== undefined && (
+              <p className="text-xs text-gray-400">
+              Audio Duration: <span className="text-gray-300">{a.duration.toFixed(2)}s</span>
+              </p>
+            )}
+            {a.error && (
+              <p className="text-xs text-red-400 mt-1">
+              Error: {a.error}
+              </p>
+            )}
+            </>
+          )}
           </div>
         );
       }
 
-      // Metadata Analysis
-      if (upload.result?.metadata_analysis) {
-        const m = upload.result!.metadata_analysis!;
-        results.push(
-          <div key="metadata-analysis" className="mb-2 p-2 border border-gray-700 rounded-md">
-          <h4 className="text-sm font-semibold text-green-300 mb-1">Metadata Analysis:</h4>
-          <p className="text-xs text-gray-400">
-          Verdict:{' '}
-          <span className={getLabelColor(m.verdict)}>{capitalizeFirst(m.verdict)}</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Fake Confidence: <span className="text-red-300">{(m.fake_confidence * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Real Confidence: <span className="text-green-300">{(m.real_confidence * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Processing Time: <span className="text-gray-300">{m.processing_time?.toFixed(2) ?? 'N/A'}s</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Avg Inference: <span className="text-gray-300">{m.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
-          </p>
-          </div>
-        );
-      }
+      const hasMetadata = !!upload.result?.metadata_analysis;
 
       return (
-        <div>{results.length > 0 ? results : <span>No issues detected</span>}</div>
+        <div className="flex flex-col gap-4">
+
+        {/* Main layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* LEFT: Video + Audio stacked */}
+        <div className="flex flex-col gap-4">
+        {videoBlock}
+        {audioBlock}
+        </div>
+
+        {/* RIGHT: Metadata */}
+        {hasMetadata && (
+          <div className="h-full">
+          <MetadataSection data={upload.result!.metadata_analysis} />
+          </div>
+        )}
+        </div>
+
+        {/* Heatmaps BELOW */}
+        {upload.result?.heatmap_url && upload.result.heatmap_url.length > 0 && (
+          <HeatmapSection urls={upload.result.heatmap_url} />
+        )}
+
+        </div>
       );
     }
 
@@ -586,8 +839,6 @@ const ReportDetail: React.FC = () => {
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null, // Changed from predicted_class to verdict
                   score_video: upload.result.video_analysis?.score_video || null,
-                  label_metadata: upload.result.metadata_analysis?.verdict || null,
-                  score_metadata: upload.result.metadata_analysis?.score_metadata || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
                 };
@@ -679,8 +930,6 @@ const ReportDetail: React.FC = () => {
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null,
                   score_video: upload.result.video_analysis?.score_video || null,
-                  label_metadata: upload.result.metadata_analysis?.verdict || null,
-                  score_metadata: upload.result.metadata_analysis?.score_metadata || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
                 };
