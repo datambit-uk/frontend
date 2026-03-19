@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Home, LifeBuoy, LogOut, Clock, FolderOpen, BarChart3, Shield } from "lucide-react";
+import { Home, LogOut, Clock, FolderOpen, BarChart3, Shield } from "lucide-react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -12,7 +12,6 @@ const navItems = [
   { label: "Recent Upload", path: "/recent-upload", icon: <Clock className="w-6 h-6" /> },
   { label: "All Uploads", path: "/all-uploads", icon: <FolderOpen className="w-6 h-6" /> },
   { label: "Usage", path: "/usage", icon: <BarChart3 className="w-6 h-6" /> },
-  { label: "Support", path: "/support", icon: <LifeBuoy className="w-6 h-6" /> },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
