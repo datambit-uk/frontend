@@ -534,7 +534,7 @@ const ReportDetail: React.FC = () => {
           Predicted Class: <span className="text-gray-300">{formatClassName(v.predicted_class)}</span>
           </p>
           <p className="text-xs text-gray-400">
-          Synthetic Score: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
+          Fake Confidence: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
           </p>
           <p className="text-xs text-gray-400">
           Real Confidence: <span className="text-green-300">{(v.real_confidence * 100).toFixed(2)}%</span>
@@ -592,7 +592,7 @@ const ReportDetail: React.FC = () => {
             <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
             </p>
             <p className="text-xs text-gray-400">
-            Synthetic Score: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
+            Fake Confidence: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
             </p>
             <p className="text-xs text-gray-400">
             Real Confidence: <span className="text-green-300">{(a.real_confidence * 100).toFixed(2)}%</span>
