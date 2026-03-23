@@ -15,6 +15,7 @@ interface AuthFormProps {
   setRememberMe: (remember: boolean) => void;
   isLoading: boolean;
   error: string;
+  isSuccess?: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onForgotPassword: () => void;
   disabled?: boolean;
@@ -33,6 +34,7 @@ interface AuthFormProps {
     setShowConfirmPassword: (show: boolean) => void;
     isRegisterLoading: boolean;
     registerError: string;
+    isRegisterSuccess?: boolean;
     onRegisterSubmit: (e: React.FormEvent) => void;
   };
 }
@@ -95,6 +97,7 @@ const AuthForm: React.FC<AuthFormProps> = ({
   setRememberMe,
   isLoading,
   error,
+  isSuccess,
   onSubmit,
   onForgotPassword,
   disabled,
@@ -240,7 +243,7 @@ const AuthForm: React.FC<AuthFormProps> = ({
           <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center text-sm text-red-400"
+          className={`text-center text-sm ${isSuccess ? 'text-green-400' : 'text-red-400'}`}
           >
           {error}
           </motion.div>
@@ -291,6 +294,7 @@ const AuthForm: React.FC<AuthFormProps> = ({
       setShowConfirmPassword,
       isRegisterLoading,
       registerError,
+      isRegisterSuccess,
       onRegisterSubmit
     } = registerProps;
 
@@ -483,7 +487,7 @@ const AuthForm: React.FC<AuthFormProps> = ({
             <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center text-sm text-red-400"
+            className={`text-center text-sm ${isRegisterSuccess ? 'text-green-400' : 'text-red-400'}`}
             >
             {registerError}
             </motion.div>

@@ -15,6 +15,7 @@ const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [isLoginSuccess, setIsLoginSuccess] = useState(false);
   const [cookieConsentGiven, setCookieConsentGiven] = useState<boolean | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   
@@ -27,6 +28,7 @@ const LoginPage: React.FC = () => {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [registerError, setRegisterError] = useState("");
+  const [isRegisterSuccess, setIsRegisterSuccess] = useState(false);
   const [isRegisterLoading, setIsRegisterLoading] = useState(false);
 
   const navigate = useNavigate();
@@ -38,6 +40,7 @@ const LoginPage: React.FC = () => {
     setShowPassword(false);
     setRememberMe(false);
     setLoginError("");
+    setIsLoginSuccess(false);
   };
 
   const clearRegisterStates = () => {
@@ -48,6 +51,7 @@ const LoginPage: React.FC = () => {
     setShowRegisterPassword(false);
     setShowConfirmPassword(false);
     setRegisterError("");
+    setIsRegisterSuccess(false);
   };
 
   const switchForm = (toRegister: boolean) => {
@@ -62,6 +66,7 @@ const LoginPage: React.FC = () => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError("");
+    setIsRegisterSuccess(false);
 
     // Validate access code
     if (!/^[A-Z0-9]{6}$/.test(accessCode)) {
@@ -100,6 +105,7 @@ const LoginPage: React.FC = () => {
         // Successfully registered, switch to login form
         switchForm(false);
         setLoginError("Registration successful! Please login.");
+        setIsLoginSuccess(true);
       } else {
         setRegisterError("Registration failed. Please try again.");
       }
@@ -114,6 +120,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setLoginError("");
+    setIsLoginSuccess(false);
 
     try {
       const response = await apiCall({
@@ -224,6 +231,7 @@ const LoginPage: React.FC = () => {
             setRememberMe={setRememberMe}
             isLoading={isLoading}
             error={loginError}
+            isSuccess={isLoginSuccess}
             onSubmit={handleSubmit}
             onForgotPassword={handleForgetPasswordClick}
             disabled={cookieConsentGiven === null}
@@ -242,6 +250,7 @@ const LoginPage: React.FC = () => {
               setShowConfirmPassword,
               isRegisterLoading,
               registerError,
+              isRegisterSuccess,
               onRegisterSubmit: handleRegisterSubmit
             }}
           />

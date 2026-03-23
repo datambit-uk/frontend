@@ -289,36 +289,66 @@ const Home: React.FC = () => {
 
         {files.length > 0 && (
           <div className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
-          <input
-          type="checkbox"
-          id="generate-heatmap"
-          checked={generateHeatmap}
-          onChange={(e) => setGenerateHeatmap(e.target.checked)}
-          className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
-          />
-          <label
-          htmlFor="generate-heatmap"
-          className="text-sm font-medium text-gray-300 cursor-pointer"
+          <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+          <button
+          onClick={() => setGenerateHeatmap(!generateHeatmap)}
+          className={`relative flex items-center justify-between w-full p-4 bg-gray-900 border ${generateHeatmap ? 'border-blue-500 bg-blue-500/10' : 'border-gray-800'} rounded-lg transition-all duration-300 hover:border-blue-400 group`}
           >
-          Generate Heatmap
-          </label>
+          <div className="flex items-center gap-4">
+          <div className={`p-2 rounded-lg ${generateHeatmap ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400'} transition-colors duration-300`}>
+          <Video className="w-6 h-6" />
+          </div>
+          <div className="text-left">
+          <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-white uppercase tracking-wider">
+          Generate AI Heatmap
+          </span>
+          <span className="px-2 py-0.5 text-[10px] font-black bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full uppercase">
+          Future Enhancement
+          </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+          Visualise engagement hotspots using our proprietary AI models
+          </p>
+          </div>
+          </div>
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${generateHeatmap ? 'bg-blue-600 border-blue-600' : 'border-gray-600'}`}>
+          {generateHeatmap && <Check className="w-4 h-4 text-white" />}
+          </div>
+          </button>
+          
+          {/* Investor/CTA Tooltip - only shows on hover */}
+          <div className="absolute left-0 -top-12 w-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <div className="bg-blue-600 text-white text-[10px] px-3 py-2 rounded shadow-xl flex items-center gap-2">
+          <span className="font-bold">INVESTOR OPPORTUNITY:</span>
+          <span>Scalable AI-driven engagement analytics engine.</span>
+          </div>
+          <div className="w-3 h-3 bg-blue-600 rotate-45 mx-auto -mt-1.5"></div>
+          </div>
           </div>
 
+          <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
           {files.length} file(s) selected
           </p>
-          <div>
           <button
-          className={`bg-blue-600 text-white font-medium py-2 px-4 rounded transition-colors ${
-            isUploading
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-blue-700"
+          className={`bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg transition-all duration-300 shadow-lg hover:shadow-blue-500/20 flex items-center gap-2 ${
+            isUploading ? "opacity-50 cursor-not-allowed" : ""
           }`}
           onClick={uploadFiles}
           disabled={isUploading}
           >
-          {isUploading ? "Uploading Files..." : "Upload Files"}
+          {isUploading ? (
+            <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            Uploading...
+            </>
+          ) : (
+            <>
+            Upload Files
+            </>
+          )}
           </button>
           </div>
           </div>
