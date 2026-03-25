@@ -12,6 +12,7 @@ const formatFileSize = (bytes: number): string => {
 const normalizeGCSUrl = (url: string) => {
     if (url.startsWith("gs://")) {
         url = url.replace("gs://genui-storage/", "https://storage.googleapis.com/genui-storage/");
+        url = url.replace("gs://genui-development-storage/", "https://storage.googleapis.com/genui-development-storage/");
     }
     return url;
 };

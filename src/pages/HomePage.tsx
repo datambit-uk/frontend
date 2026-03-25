@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Video, Copy, Check, X } from "lucide-react";
-import MediaCard from "../components/MediaCard";
 import Dropbox from "../components/Dropbox";
 
 interface UploadResponse {
@@ -11,8 +10,8 @@ interface UploadResponse {
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const [showDropbox, setShowDropbox] = useState(false);
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const showDropbox = true;
+  const selectedCard = "Media";
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -50,21 +49,6 @@ const Home: React.FC = () => {
       return () => clearInterval(countdownTimer);
     }
   }, [responseMessage.status, responseMessage.uploadId, navigate]);
-
-  const handleMediaClick = (type: string) => {
-    if (selectedCard === type) {
-      setSelectedCard(null);
-      setShowDropbox(false);
-      setResponseMessage({ status: null, message: "" });
-    } else {
-      setSelectedCard(type);
-      setShowDropbox(true);
-      setResponseMessage({ status: null, message: "" });
-    }
-    setFiles([]);
-    setUploadProgress(0);
-    setDropboxKey((prev) => prev + 1);
-  };
 
   const handleFilesAdded = (newFiles: File[]) => {
     if (!selectedCard) return;
@@ -151,6 +135,9 @@ const Home: React.FC = () => {
       return new Promise((resolve, reject) => {
         const formData = new FormData();
         group.files.forEach((file) => formData.append("files", file));
+        if (generateHeatmap) {
+          formData.append("generate_heatmaps", "true");
+        }
 
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
@@ -219,9 +206,6 @@ const Home: React.FC = () => {
         resetNoProgressTimer();
 
         let uploadUrl = `${API_URL}/api/v1/${group.type}/upload`;
-        if (generateHeatmap) {
-          uploadUrl += `?generate-heatmaps=true`;
-        }
 
         xhr.open("POST", uploadUrl, true);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -261,15 +245,6 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-    <MediaCard
-    icon={<Video className="w-8 h-8 text-blue-400" />}
-    label="Upload Video / Audio"
-    onClick={() => handleMediaClick("Media")}
-    isSelected={selectedCard === "Media"}
-    />
-    </div>
-
     {showDropbox && (
       <div className="space-y-4">
       {/*
@@ -302,10 +277,10 @@ const Home: React.FC = () => {
           <div className="text-left">
           <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-white uppercase tracking-wider">
-          Generate AI Heatmap
+          Generate Heatmap
           </span>
           <span className="px-2 py-0.5 text-[10px] font-black bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full uppercase">
-          Future Enhancement
+          Takes Longer
           </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">
@@ -321,8 +296,8 @@ const Home: React.FC = () => {
           {/* Investor/CTA Tooltip - only shows on hover */}
           <div className="absolute left-0 -top-12 w-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           <div className="bg-blue-600 text-white text-[10px] px-3 py-2 rounded shadow-xl flex items-center gap-2">
-          <span className="font-bold">INVESTOR OPPORTUNITY:</span>
-          <span>Scalable AI-driven engagement analytics engine.</span>
+          <span className="font-bold">Available on Portable version</span>
+          <span>Air gapped | Stand alone | Edge</span>
           </div>
           <div className="w-3 h-3 bg-blue-600 rotate-45 mx-auto -mt-1.5"></div>
           </div>

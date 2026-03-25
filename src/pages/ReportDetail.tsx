@@ -52,7 +52,6 @@ interface Result {
   verdict?: string;
   real_confidence?: number;
   fake_confidence?: number;
-  heatmap_paths?: string[] | null;
   predicted_class?: string | null;
   processing_time?: number;
   avg_inference_ms?: number;
@@ -61,6 +60,7 @@ interface Result {
   audio_analysis: AudioAnalysis | null;
   image_result: ImageResult | null;
   heatmap_url: string[] | null;
+  heatmap_paths: string[] | null;
   metadata_analysis: any | null;
 }
 
@@ -83,7 +83,9 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
   if (!data) return null;
 
   const verdict = data.verdict || 'UNKNOWN';
-  const score = data.score !== undefined ? data.score : (data.suspicious_score !== undefined ? data.suspicious_score : 'N/A');
+  const score = data.suspicious_score !== undefined ? data.suspicious_score : (data.score !== undefined ? data.score : 'N/A');
+  const anomalies = data.top_anomalies || data.anomalies || [];
+  const inconsistencies = data.top_inconsistencies || data.metadata_inconsistencies || [];
 
   return (
     <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm">
@@ -113,35 +115,35 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
 
     <div className="space-y-2">
     <div className="flex items-center gap-2">
-    <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict === 'SUSPICIOUS' ? 'bg-yellow-900/40 text-yellow-400' : 'bg-green-900/40 text-green-400'}`}>
+    <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict === 'SUSPICIOUS' ? 'bg-yellow-900/40 text-yellow-400' : (verdict === 'CLEAN' ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400')}`}>
     {verdict}
     </span>
     <span className="text-[10px] text-gray-400 font-mono">Score: {typeof score === 'number' ? score.toFixed(4) : score}</span>
     </div>
 
-    {data.source_analysis && (
+    {(data.forensic_summary || data.source_analysis) && (
       <div className="flex items-center gap-1 text-[10px] text-gray-400">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
-      Likely Source: <span className="text-gray-200 font-medium">{data.source_analysis.likely_source}</span>
-      <span className="opacity-60">(Conf: {data.source_analysis.confidence?.toFixed(2)})</span>
+      Likely Source: <span className="text-gray-200 font-medium">{(data.forensic_summary?.likely_source || data.source_analysis?.likely_source || 'UNKNOWN')}</span>
+      <span className="opacity-60">(Conf: {(data.confidence || data.forensic_summary?.hw_sw_confidence || data.source_analysis?.confidence || 0).toFixed(2)})</span>
       </div>
     )}
 
-    {data.anomalies && data.anomalies.length > 0 && (
+    {anomalies.length > 0 && (
       <div className="text-[10px] bg-yellow-900/10 border border-yellow-700/20 rounded p-1.5">
       <div className="flex items-center gap-1 text-yellow-500 font-bold mb-1 uppercase text-[9px]">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
-      Detected Anomalies ({data.anomalies.length})
+      Detected Anomalies ({anomalies.length})
       </div>
       <ul className="list-disc list-inside text-gray-400 space-y-0.5">
-      {data.anomalies.slice(0, isExpanded ? undefined : 2).map((a: string, i: number) => (
+      {anomalies.slice(0, isExpanded ? undefined : 2).map((a: string, i: number) => (
         <li key={i} className="leading-tight">{a}</li>
       ))}
-      {!isExpanded && data.anomalies.length > 2 && <li className="list-none text-blue-400 mt-0.5 font-medium">+ {data.anomalies.length - 2} more...</li>}
+      {!isExpanded && anomalies.length > 2 && <li className="list-none text-blue-400 mt-0.5 font-medium">+ {anomalies.length - 2} more...</li>}
       </ul>
       </div>
     )}
@@ -153,52 +155,52 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
       animate={{ opacity: 1, y: 0 }}
       className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
       >
-      {data.file_info && (
+      {(data.file_info || data.file_hash) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1.5 border-b border-gray-800 pb-1">File Information</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
         <div className="flex justify-between border-b border-gray-800/50 pb-0.5">
         <span className="text-gray-500">Size</span>
-        <span className="text-gray-300 font-mono">{data.file_info.size}</span>
+        <span className="text-gray-300 font-mono">{data.file_size || data.file_info?.size || 'N/A'}</span>
         </div>
         <div className="flex justify-between border-b border-gray-800/50 pb-0.5">
         <span className="text-gray-500">Type</span>
-        <span className="text-gray-300 font-mono">{data.file_info.type}</span>
+        <span className="text-gray-300 font-mono">{data.file_type || data.file_info?.type || 'N/A'}</span>
         </div>
         <div className="col-span-2 flex flex-col gap-0.5">
         <span className="text-gray-500">File Hash (SHA-256)</span>
-        <span className="text-gray-400 font-mono break-all bg-black/40 p-1 rounded select-all">{data.file_info.hash}</span>
+        <span className="text-gray-400 font-mono break-all bg-black/40 p-1 rounded select-all">{data.file_hash || data.file_info?.hash || 'N/A'}</span>
         </div>
         </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-      {data.matrix_structure && (
+      {(data.forensic_summary?.matrix_interpretation || data.matrix_structure) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Matrix Structure</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.matrix_structure}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.matrix_interpretation || data.matrix_structure}</p>
         </div>
       )}
-      {data.bitrate_analysis && (
+      {(data.forensic_summary?.bitrate_category || data.bitrate_analysis) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Bitrate Analysis</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.bitrate_analysis}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.bitrate_category || data.bitrate_analysis}</p>
         </div>
       )}
-      {data.frame_rate && (
+      {(data.forensic_summary?.fps || data.frame_rate) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Frame Rate</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.frame_rate}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.fps || data.frame_rate}</p>
         </div>
       )}
       </div>
 
-      {data.hex_analysis && (
+      {(data.hex_format || data.hex_analysis) && (
         <div>
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Hex Analysis</p>
         <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
-        {JSON.stringify(data.hex_analysis, null, 2)}
+        {data.hex_format || JSON.stringify(data.hex_analysis, null, 2)}
         </pre>
         </div>
       )}
@@ -212,25 +214,25 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
         </div>
       )}
 
-      {data.quantization_analysis && (
+      {(data.quantization_analysis || data.quantization_anomaly_count !== undefined) && (
         <div>
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Quantization Analysis</p>
         <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded font-mono leading-tight">
-        {JSON.stringify(data.quantization_analysis, null, 2)}
+        {data.quantization_analysis ? JSON.stringify(data.quantization_analysis, null, 2) : `Anomaly Count: ${data.quantization_anomaly_count}`}
         </pre>
         </div>
       )}
 
-      {(data.atom_structure || data.atom_tree || data.atoms) && (
+      {(data.atom_structure || data.atom_tree || data.atoms || data.atom_anomaly_count !== undefined) && (
         <div>
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Moov / Atom structure</p>
         <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
-        {JSON.stringify(data.atom_structure || data.atom_tree || data.atoms, null, 2)}
+        {data.atom_structure || data.atom_tree || data.atoms ? JSON.stringify(data.atom_structure || data.atom_tree || data.atoms, null, 2) : `Atom Anomaly Count: ${data.atom_anomaly_count}`}
         </pre>
         </div>
       )}
 
-      {data.metadata_inconsistencies && data.metadata_inconsistencies.length > 0 && (
+      {inconsistencies.length > 0 && (
         <div className="bg-red-900/10 border border-red-700/20 rounded p-2">
         <p className="text-[9px] font-black text-red-400 uppercase mb-1.5 flex items-center gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -239,7 +241,7 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
         Metadata inconsistencies
         </p>
         <ul className="list-disc list-inside text-[10px] text-red-400/80 space-y-1">
-        {data.metadata_inconsistencies.map((err: string, i: number) => <li key={i}>{err}</li>)}
+        {inconsistencies.map((err: string, i: number) => <li key={i}>{err}</li>)}
         </ul>
         </div>
       )}
@@ -255,8 +257,8 @@ const HeatmapSection: React.FC<{ urls: string[] | null | undefined }> = ({ urls 
   return (
     <div className="mt-4 pt-3 border-t border-gray-700/50">
     <div className="flex items-center gap-2 mb-3">
-    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Forensic Heatmaps</h4>
-    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">AI Visual Evidence</span>
+    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Heatmap</h4>
+    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">Experimental</span>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {urls.map((url, i) => {
@@ -642,8 +644,8 @@ const ReportDetail: React.FC = () => {
         </div>
 
         {/* Heatmaps BELOW */}
-        {upload.result?.heatmap_url && upload.result.heatmap_url.length > 0 && (
-          <HeatmapSection urls={upload.result.heatmap_url} />
+        {(upload.result?.heatmap_url || upload.result?.heatmap_paths) && (
+          <HeatmapSection urls={upload.result.heatmap_url || upload.result.heatmap_paths} />
         )}
 
         </div>
@@ -825,7 +827,7 @@ const ReportDetail: React.FC = () => {
           <td className="px-6 py-4 text-sm text-gray-300">
           <div className="flex justify-between items-center gap-2">
           <div>{formatResult(upload)}</div>
-          {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
+          {upload.result && (upload.result.heatmap_url || upload.result.heatmap_paths) && (upload.result.heatmap_url?.length || upload.result.heatmap_paths?.length) && (
             <button
             onClick={() => {
               if (upload.result) {
@@ -834,7 +836,7 @@ const ReportDetail: React.FC = () => {
                   filename: upload.file_metadata.filename,
                   content_type: upload.file_metadata.content_type,
                   size: upload.file_metadata.size,
-                  heatmap_urls: upload.result.heatmap_url,
+                  heatmap_urls: upload.result.heatmap_url || upload.result.heatmap_paths,
                   label_audio: upload.result.audio_analysis?.verdict || null,
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null, // Changed from predicted_class to verdict
@@ -916,7 +918,7 @@ const ReportDetail: React.FC = () => {
           </div>
           <div className="flex justify-between items-start gap-2">
           <div className="flex-1">{formatResult(upload)}</div>
-          {upload.result && upload.result.heatmap_url && upload.result.heatmap_url.length > 0 && (
+          {upload.result && (upload.result.heatmap_url || upload.result.heatmap_paths) && (upload.result.heatmap_url?.length || upload.result.heatmap_paths?.length) && (
             <button
             onClick={() => {
               if (upload.result) {
@@ -925,7 +927,7 @@ const ReportDetail: React.FC = () => {
                   filename: upload.file_metadata.filename,
                   content_type: upload.file_metadata.content_type,
                   size: upload.file_metadata.size,
-                  heatmap_urls: upload.result.heatmap_url,
+                  heatmap_urls: upload.result.heatmap_url || upload.result.heatmap_paths,
                   label_audio: upload.result.audio_analysis?.verdict || null,
                   score_audio: upload.result.audio_analysis?.score_audio || null,
                   label_video: upload.result.video_analysis?.verdict || null,
