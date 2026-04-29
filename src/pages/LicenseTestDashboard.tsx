@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Shield, Upload, Play, History, CheckCircle, XCircle, Clock, Smartphone, Database, AlertCircle } from "lucide-react";
+import { Shield, Upload, Play, History, CheckCircle, XCircle, Clock, Smartphone, Database, AlertCircle, RefreshCw } from "lucide-react";
 
 interface PhoneHomeResponse {
   valid: boolean;
@@ -22,40 +22,95 @@ interface CallLogEntry {
 
 const LicenseTestDashboard: React.FC = () => {
   const [licenseJson, setLicenseJson] = useState("");
+  const [availableLicenses, setAvailableLicenses] = useState<any[]>([]);
   const [activeLicenseId, setActiveLicenseId] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState("fp_test_device_001");
   const [videoCount, setVideoCount] = useState(0);
   const [audioCount, setAudioCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResponse, setLastResponse] = useState<PhoneHomeResponse | null>(null);
   const [history, setHistory] = useState<CallLogEntry[]>([]);
 
+  // Fixed path: prefix is /api/v1/usage, not /api/v1/licensing
   const API_URL = "https://production.datambit.com";
+  const ENDPOINT_PREFIX = "/api/v1/usage";
 
-  const handleUploadLicense = () => {
+  const fetchLicenses = async () => {
+    try {
+      setFetching(true);
+      const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/licenses`);
+      if (!response.ok) throw new Error("Failed to fetch licenses");
+      const data = await response.json();
+      setAvailableLicenses(data);
+      if (data.length > 0 && !activeLicenseId) {
+        setActiveLicenseId(data[0].license_id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchLicenses();
+  }, []);
+
+  const handleLoadLicense = () => {
     try {
       const parsed = JSON.parse(licenseJson);
-      if (!parsed.license_id) throw new Error("Missing license_id in JSON");
       
-      setActiveLicenseId(parsed.license_id);
+      // Support both flat response from GET /licenses and nested generator output
+      const licenseId = parsed.license_id || (parsed.license && parsed.license.license_id);
+      
+      if (!licenseId) {
+        throw new Error("Missing license_id in JSON (checked root and .license.license_id)");
+      }
+      
+      setActiveLicenseId(licenseId);
       setError(null);
-      // In a real scenario, we might POST this to /api/v1/licensing/upload
-      // but the spec says "Upload section: paste license JSON once" and 
-      // "Dashboard lets testers upload licenses once and simulate repeated requests."
-      // Since the phone-home endpoint lookups from DB, we assume the tester 
-      // has already ensured the license is in the DB, OR we provide a button 
-      // to actually sync it if that's part of the system.
-      // For this simulation dashboard, we'll just track the ID locally.
-      alert(`License ${parsed.license_id} loaded locally for simulation.`);
+      alert(`License ID '${licenseId}' loaded into dashboard state.`);
     } catch (err) {
-      setError("Invalid License JSON. Please check the format.");
+      setError(`Load failed: ${err instanceof Error ? err.message : "Invalid JSON format"}`);
+    }
+  };
+
+  const syncLicenseToDb = async () => {
+    try {
+      const parsed = JSON.parse(licenseJson);
+      setSyncing(true);
+      setError(null);
+
+      // The backend store_license expects { "license": {...}, "signature": "..." }
+      // If user pasted a flat response, we might need to wrap it, but usually 
+      // they should paste the generator output for a new sync.
+      const payload = parsed.license ? parsed : { license: parsed, signature: parsed.signature || "MOCK_SIG" };
+
+      const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/licenses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+
+      setActiveLicenseId(result.license_id);
+      fetchLicenses(); // Refresh the dropdown
+      alert(`Successfully synced license ${result.license_id} to database.`);
+    } catch (err) {
+      setError(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
     }
   };
 
   const sendPhoneHomeRequest = async () => {
     if (!activeLicenseId) {
-      setError("Please 'load' a license first by pasting JSON and clicking Load.");
+      setError("Please 'load' or 'sync' a license first.");
       return;
     }
 
@@ -72,14 +127,17 @@ const LicenseTestDashboard: React.FC = () => {
     };
 
     try {
-      // Anonymous endpoint - no JWT required
-      const response = await fetch(`${API_URL}/api/v1/licensing/phone-home`, {
+      // Corrected endpoint path
+      const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/phone-home`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP Error: ${response.status}`);
+      }
 
       const result: PhoneHomeResponse = await response.json();
       setLastResponse(result);
@@ -111,7 +169,7 @@ const LicenseTestDashboard: React.FC = () => {
           Phone-Home License Validation Test Dashboard
         </h1>
         <div className="text-xs font-mono text-gray-500 bg-gray-900 px-3 py-1 rounded-full border border-gray-800">
-          v1.0.0-PROTOTYPE
+          v1.0.2-alpha
         </div>
       </div>
 
@@ -124,7 +182,7 @@ const LicenseTestDashboard: React.FC = () => {
               <Upload size={18} className="text-blue-400" /> 1. Load License JSON
             </h2>
             <p className="text-sm text-gray-400 mb-4">
-              Paste the JSON output from <code>vendor_license_generator.py</code> here.
+              Paste the JSON output from <code>vendor_license_generator.py</code> or a database export.
             </p>
             <textarea
               className="w-full h-48 bg-black border border-gray-700 rounded-lg p-4 font-mono text-xs focus:outline-none focus:border-blue-500 transition-colors"
@@ -132,28 +190,61 @@ const LicenseTestDashboard: React.FC = () => {
               value={licenseJson}
               onChange={(e) => setLicenseJson(e.target.value)}
             />
-            <button
-              onClick={handleUploadLicense}
-              className="mt-4 w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Database size={16} /> Load License ID
-            </button>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleLoadLicense}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 border border-gray-700"
+              >
+                <Database size={16} /> Load Local ID
+              </button>
+              <button
+                onClick={syncLicenseToDb}
+                disabled={syncing || !licenseJson}
+                className="flex-1 bg-blue-900/40 hover:bg-blue-800/60 text-blue-100 font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 border border-blue-800/50 disabled:opacity-50"
+              >
+                {syncing ? <RefreshCw size={16} className="animate-spin" /> : <RefreshCw size={16} />} 
+                Sync to Database
+              </button>
+            </div>
           </div>
 
           {/* Section 2: Simulate Request */}
           <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Play size={18} className="text-green-400" /> 2. Simulate Phone-Home
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Play size={18} className="text-green-400" /> 2. Simulate Phone-Home
+              </h2>
+              <button 
+                onClick={fetchLicenses}
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                disabled={fetching}
+              >
+                <RefreshCw size={12} className={fetching ? "animate-spin" : ""} /> Refresh List
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500 uppercase font-bold">License ID</label>
-                <input
-                  type="text"
-                  disabled
-                  value={activeLicenseId || "None loaded"}
-                  className="bg-black border border-gray-800 rounded px-4 py-2 text-sm text-gray-400 font-mono"
-                />
+                <label className="text-xs text-gray-500 uppercase font-bold">Select License ID</label>
+                {availableLicenses.length > 0 ? (
+                  <select
+                    value={activeLicenseId || ""}
+                    onChange={(e) => setActiveLicenseId(e.target.value)}
+                    className="bg-black border border-gray-700 rounded px-4 py-2 text-sm text-blue-400 font-mono focus:outline-none focus:border-blue-500"
+                  >
+                    {availableLicenses.map(lic => (
+                      <option key={lic.id} value={lic.license_id}>
+                        {lic.license_id} ({lic.customer})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value={activeLicenseId || "None in DB - Please Load/Sync"}
+                    className="bg-black border border-gray-800 rounded px-4 py-2 text-sm text-gray-500 font-mono"
+                  />
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-500 uppercase font-bold">Fingerprint (Device Hash)</label>
@@ -206,7 +297,7 @@ const LicenseTestDashboard: React.FC = () => {
               )}
             </button>
             {error && (
-              <div className="mt-4 bg-red-900/30 border border-red-800 text-red-200 p-3 rounded flex items-center gap-2 text-sm">
+              <div className="mt-4 bg-red-900/30 border border-red-800 text-red-200 p-3 rounded flex items-center gap-2 text-sm animate-pulse">
                 <AlertCircle size={16} /> {error}
               </div>
             )}
@@ -323,4 +414,3 @@ const ResponseField: React.FC<{ label: string, value: string | number, highlight
 );
 
 export default LicenseTestDashboard;
-

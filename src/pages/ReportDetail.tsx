@@ -26,6 +26,30 @@ interface VideoAnalysis {
   num_windows?: number;
 }
 
+interface SuspiciousChunk {
+  rank: number;
+  chunk_index: number;
+  start_sec: number;
+  end_sec: number;
+  fake_confidence: number;
+}
+
+interface ChunkingInfo {
+  enabled: boolean;
+  aggregation?: string;
+  top_suspicious_chunks: SuspiciousChunk[];
+  num_chunks?: number;
+  decision_threshold?: number;
+  window_sec?: number;
+  stride_sec?: number;
+}
+
+interface AudioPerformance {
+  inference_time_ms?: number;
+  total_time_ms?: number;
+  chunking?: ChunkingInfo;
+}
+
 interface AudioAnalysis {
   error: string | null;
   verdict: string;
@@ -36,6 +60,7 @@ interface AudioAnalysis {
   duration?: number;
   audio_path?: string;
   score_audio?: number;
+  performance?: AudioPerformance;
 }
 
 interface ImageResult {
@@ -251,6 +276,96 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
   );
 };
 
+const SuspiciousChunksTimeline: React.FC<{ chunks: SuspiciousChunk[]; duration: number }> = ({ chunks, duration }) => {
+  if (!chunks || chunks.length === 0) return null;
+
+  const totalDuration = duration > 0 ? duration : Math.max(...chunks.map(c => c.end_sec));
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Rank colours: rank 1 = most suspicious (darker red), rest lighter
+  const rankColors = ['#dc2626', '#ef4444', '#f87171'];
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-700/40">
+    <p className="text-[10px] font-black text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    Suspicious Segments (Ranked)
+    </p>
+    <p className="text-[10px] text-gray-400 mb-2">The following time segments showed high probability of manipulation:</p>
+
+    {/* Timeline bar */}
+    <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
+    {chunks.map((chunk) => {
+      const left = (chunk.start_sec / totalDuration) * 100;
+      const width = ((chunk.end_sec - chunk.start_sec) / totalDuration) * 100;
+      const color = rankColors[Math.min(chunk.rank - 1, rankColors.length - 1)];
+      return (
+        <div
+        key={chunk.rank}
+        className="absolute top-0 h-full flex items-center justify-center"
+        style={{
+          left: `${left}%`,
+          width: `${width}%`,
+          backgroundColor: color,
+          opacity: 0.8,
+        }}
+        title={`#${chunk.rank}: ${formatTime(chunk.start_sec)}–${formatTime(chunk.end_sec)} (${(chunk.fake_confidence * 100).toFixed(1)}%)`}
+        >
+        <span className="text-[9px] font-bold text-white drop-shadow">{chunk.rank}</span>
+        </div>
+      );
+    })}
+    {/* Start / end labels */}
+    <span className="absolute left-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">0:00</span>
+    <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
+    </div>
+
+    {/* Chunk cards */}
+    <div className="flex flex-wrap gap-2">
+    {chunks.map((chunk) => {
+      const color = rankColors[Math.min(chunk.rank - 1, rankColors.length - 1)];
+      return (
+        <div
+        key={chunk.rank}
+        className="flex-1 min-w-[120px] border rounded-lg p-2 bg-red-950/20"
+        style={{ borderColor: color + '60' }}
+        >
+        <div className="flex items-center justify-between mb-1">
+        <span
+        className="text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center text-white"
+        style={{ backgroundColor: color }}
+        >
+        {chunk.rank}
+        </span>
+        <span className="text-[10px] font-mono text-gray-300" style={{ color }}>
+        {formatTime(chunk.start_sec)} – {formatTime(chunk.end_sec)}
+        </span>
+        </div>
+        <p className="text-[9px] text-gray-400 mb-1">
+        Confidence: <span className="font-bold text-red-400">{(chunk.fake_confidence * 100).toFixed(1)}%</span>
+        </p>
+        {/* Mini confidence bar */}
+        <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+        <div
+        className="h-full rounded-full"
+        style={{ width: `${chunk.fake_confidence * 100}%`, backgroundColor: color }}
+        />
+        </div>
+        </div>
+      );
+    })}
+    </div>
+    </div>
+  );
+};
+
 const HeatmapSection: React.FC<{ urls: string[] | null | undefined }> = ({ urls }) => {
   if (!urls || urls.length === 0) return null;
 
@@ -258,7 +373,7 @@ const HeatmapSection: React.FC<{ urls: string[] | null | undefined }> = ({ urls 
     <div className="mt-4 pt-3 border-t border-gray-700/50">
     <div className="flex items-center gap-2 mb-3">
     <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Heatmap</h4>
-    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">Experimental</span>
+    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">Deleted after 30 days</span>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {urls.map((url, i) => {
@@ -615,7 +730,16 @@ const ReportDetail: React.FC = () => {
               Error: {a.error}
               </p>
             )}
-            </>
+            {/* Suspicious chunks timeline — only when chunking is enabled */}
+            {a.performance?.chunking?.enabled &&
+              a.performance.chunking.top_suspicious_chunks &&
+              a.performance.chunking.top_suspicious_chunks.length > 0 && (
+                <SuspiciousChunksTimeline
+                chunks={a.performance.chunking.top_suspicious_chunks}
+                duration={a.duration ?? 0}
+                />
+              )}
+              </>
           )}
           </div>
         );
