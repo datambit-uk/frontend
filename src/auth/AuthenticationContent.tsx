@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { isTokenExpired } from '../api/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -17,34 +18,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [refreshToken, setRefreshToken] = useState<string | null>(
     localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken')
   );
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token && !isTokenExpired(token));
 
 
   useEffect(() => {
-    if (token) {
-      setIsAuthenticated(true);
-    } else {
-      localStorage.removeItem('jwtToken');
-      sessionStorage.removeItem('jwtToken');
-      localStorage.removeItem('refreshToken');
-      sessionStorage.removeItem('refreshToken');
-      setIsAuthenticated(false);
-    }
-  }, [token]);
+    const checkToken = () => {
+      const currentToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
+      const currentRefreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+      
+      setToken(currentToken);
+      setRefreshToken(currentRefreshToken);
+
+      if (currentToken && isTokenExpired(currentToken)) {
+        logout();
+      } else if (currentToken) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkToken();
+
+    window.addEventListener('auth-change', checkToken);
+    window.addEventListener('storage', checkToken);
+
+    // Check every minute
+    const interval = setInterval(checkToken, 60000);
+    return () => {
+      window.removeEventListener('auth-change', checkToken);
+      window.removeEventListener('storage', checkToken);
+      clearInterval(interval);
+    };
+  }, []);
 
   const login = (accessToken: string, refreshToken: string, remember: boolean) => {
     const cookieConsent = localStorage.getItem("cookieConsent");
+    const useSessionStorage = !(remember && cookieConsent === "accepted");
     
-    if (remember && cookieConsent === "accepted") {
-      localStorage.setItem("jwtToken", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-    } else {
-      sessionStorage.setItem("jwtToken", accessToken);
-      sessionStorage.setItem("refreshToken", refreshToken);
-    }
+    const storage = useSessionStorage ? sessionStorage : localStorage;
+    storage.setItem("jwtToken", accessToken);
+    storage.setItem("refreshToken", refreshToken);
     
     setToken(accessToken);
     setRefreshToken(refreshToken);
+    setIsAuthenticated(true);
+
+    window.dispatchEvent(new Event('auth-change'));
   };
 
   const logout = () => {
@@ -54,6 +74,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem('refreshToken');
     setToken(null);
     setRefreshToken(null);
+    setIsAuthenticated(false);
+
+    window.dispatchEvent(new Event('auth-change'));
   };
 
   return (

@@ -30,12 +30,41 @@ const getRefreshToken = (): string | null => {
     return localStorage.getItem('refreshToken') ?? sessionStorage.getItem('refreshToken') ?? null;
 };
 
+export const isTokenExpired = (token: string | null): boolean => {
+    if (!token) return true;
+    try {
+        const parts = token.split('.');
+        if (parts.length < 2) return true;
+        
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        const payload = JSON.parse(jsonPayload);
+        if (!payload || typeof payload.exp !== 'number') return true;
+        
+        const now = Math.floor(Date.now() / 1000);
+        return payload.exp < now;
+    } catch (e) {
+        return true;
+    }
+};
+
 const saveTokens = (jwt: string, refreshToken: string, useSessionStorage: boolean = false) => {
     const storage = useSessionStorage ? sessionStorage : localStorage;
-    console.log(storage);
-    localStorage.setItem('jwtToken', jwt);
-    console.log(localStorage.getItem('jwtToken'));
-    localStorage.setItem('refreshToken', refreshToken);
+    storage.setItem('jwtToken', jwt);
+    storage.setItem('refreshToken', refreshToken);
+    window.dispatchEvent(new Event('auth-change'));
+};
+
+const clearTokens = () => {
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('jwtToken');
+    sessionStorage.removeItem('refreshToken');
+    window.dispatchEvent(new Event('auth-change'));
 };
 
 const refreshAuthToken = async (): Promise<boolean> => {
@@ -61,16 +90,12 @@ const refreshAuthToken = async (): Promise<boolean> => {
             }, 
             mode: "cors"
         });
-
-        console.log(response)
         
         if (!response.ok) {
             throw new Error("Token refresh failed");
         }
         
         const data = await response.json();
-
-        console.log(data.message)
         
         const useSessionStorage = !localStorage.getItem('jwtToken') && !!sessionStorage.getItem('jwtToken');
         saveTokens(data.message, refreshToken, useSessionStorage);
@@ -111,11 +136,23 @@ export const apiCall = async ({
     }
     
     if (jwtToken) {
-        const token = getJwtToken();
+        let token = getJwtToken();
         if (token === null) {
             window.location.href = '/login';
             throw new Error("Token missing");
         }
+
+        if (isTokenExpired(token) && auto_refresh) {
+            const refreshed = await refreshAuthToken();
+            if (refreshed) {
+                token = getJwtToken();
+            } else {
+                clearTokens();
+                window.location.href = '/login';
+                throw new Error("Session expired. Redirecting to login page.");
+            }
+        }
+        
         requestHeaders["Authorization"] = `Bearer ${token}`;
     }
 
@@ -134,7 +171,6 @@ export const apiCall = async ({
     
     // If unauthorized and we haven't tried refreshing yet
     if (auto_refresh && response.status === 401 ) {
-        console.log("UNATHHH")
         const refreshed = await refreshAuthToken();
         
         if (refreshed) {
@@ -151,11 +187,8 @@ export const apiCall = async ({
             }
         } else {
             // Clear tokens and redirect if refresh failed
-            // localStorage.removeItem('jwtToken');
-            // localStorage.removeItem('refreshToken');
-            // sessionStorage.removeItem('jwtToken');
-            // sessionStorage.removeItem('refreshToken');
-            // window.location.href = '/login';
+            clearTokens();
+            window.location.href = '/login';
             throw new Error("Authentication failed. Redirecting to login page.");
         }
     }
@@ -163,6 +196,10 @@ export const apiCall = async ({
     const data = await response.json();
     
     if (!response.ok) {
+        if (response.status === 401) {
+            clearTokens();
+            window.location.href = '/login';
+        }
         throw new Error(data.message || `Error: ${response.status}`);
     }
     

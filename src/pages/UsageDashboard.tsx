@@ -36,15 +36,12 @@
     const fetchGroups = async () => {
       try {
         const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
-        const response = await fetch(`${API_URL}/api/v1/usage/my-groups`, {
+        const response = await fetch(`${API_URL}/api/v1/usage/groups`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
           const data = await response.json();
           setGroups(data);
-          // Default to Global if found
-          const globalGroup = data.find((g: Group) => g.name === 'Global');
-          if (globalGroup) setGroupId(globalGroup.id);
         }
       } catch (err) {
         console.error("Failed to fetch groups", err);
@@ -53,6 +50,7 @@
 
     const fetchStats = async () => {
       setLoading(true);
+      setError(null);
       try {
         const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
 
@@ -61,9 +59,8 @@
         if (groupId) params.append('group_id', groupId);
         if (timeframe) params.append('timeframe', timeframe);
         
-        if (params.toString()) url += `?${params.toString()}`;
+        url += `?${params.toString()}`;
 
-        console.log(`Fetching usage stats from: ${url}`);
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -163,57 +160,52 @@
       </div>
 
       <div className="bg-gray-900/50 p-6 rounded-xl border border-gray-800">
-      <h2 className="text-lg font-semibold mb-4">Group Insights</h2>
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-      <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500 uppercase font-bold">Select Group</label>
+      <h2 className="text-lg font-semibold mb-4">Filtering & Insights</h2>
+      <div className="flex flex-col md:flex-row gap-6 mb-6">
+      <div className="flex flex-col gap-1 flex-1">
+      <label className="text-xs text-gray-500 uppercase font-bold mb-1">Select Group Context</label>
+      <div className="flex gap-2">
       <select
-      className="bg-black/40 border border-gray-700 rounded px-4 py-2 text-sm w-64 focus:outline-none focus:border-blue-500 text-white"
+      className="bg-black/40 border border-gray-700 rounded-lg px-4 py-2 text-sm flex-1 focus:outline-none focus:border-blue-500 text-white transition-colors"
       value={groupId}
       onChange={(e) => setGroupId(e.target.value)}
       >
-      <option value="">My Individual Usage</option>
+      <option value="">Individual (Private)</option>
       {groups.map(group => (
         <option key={group.id} value={group.id}>{group.name}</option>
       ))}
       </select>
       </div>
+      </div>
 
-      <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500 uppercase font-bold">Timeframe</label>
+      <div className="flex flex-col gap-1 w-full md:w-48">
+      <label className="text-xs text-gray-500 uppercase font-bold mb-1">Timeframe</label>
       <select
-      className="bg-black/40 border border-gray-700 rounded px-4 py-2 text-sm w-64 focus:outline-none focus:border-blue-500 text-white"
+      className="bg-black/40 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white transition-colors"
       value={timeframe}
       onChange={(e) => setTimeframe(e.target.value)}
       >
-      <option value="0">Current Month</option>
+      <option value="7">Last 7 Days</option>
       <option value="30">Last 30 Days</option>
-      <option value="60">Last 60 Days</option>
       <option value="90">Last 90 Days</option>
       </select>
-      </div>
-
-      <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500 uppercase font-bold">Manual Group ID</label>
-      <input
-      type="text"
-      placeholder="Enter Group ID..."
-      className="bg-black/40 border border-gray-700 rounded px-4 py-2 text-sm w-64 focus:outline-none focus:border-blue-500"
-      value={groupId}
-      onChange={(e) => setGroupId(e.target.value)}
-      />
       </div>
       </div>
 
       <div className="text-gray-400 text-sm">
-      <p>Detailed breakdown and graphs will appear here as more data is collected.</p>
-      <div className="mt-4 h-32 bg-black/20 rounded flex items-end p-4 gap-2">
-      {/* Simple CSS bar chart visualization placeholder */}
-      <div className="bg-blue-600/50 w-full h-[30%] rounded-t"></div>
-      <div className="bg-blue-600/50 w-full h-[60%] rounded-t"></div>
-      <div className="bg-blue-600/50 w-full h-[45%] rounded-t"></div>
-      <div className="bg-blue-600/50 w-full h-[80%] rounded-t"></div>
-      <div className="bg-blue-600/50 w-full h-[55%] rounded-t"></div>
+      <div className="flex justify-between items-end mb-2">
+        <p>Activity trend for selected {groupId ? 'group' : 'account'}</p>
+        <span className="text-xs font-mono text-gray-500">{timeframe} day window</span>
+      </div>
+      <div className="h-32 bg-black/20 rounded-xl flex items-end p-4 gap-2 border border-white/5">
+      {/* Simple animated-style bar chart visualization placeholder */}
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[30%] rounded-t-lg transition-all duration-500"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[60%] rounded-t-lg transition-all duration-500 delay-75"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[45%] rounded-t-lg transition-all duration-500 delay-100"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[80%] rounded-t-lg transition-all duration-500 delay-150"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[55%] rounded-t-lg transition-all duration-500 delay-200"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[40%] rounded-t-lg transition-all duration-500 delay-300"></div>
+      <div className="bg-blue-600/30 hover:bg-blue-600/50 w-full h-[65%] rounded-t-lg transition-all duration-500 delay-500"></div>
       </div>
       </div>
       </div>
