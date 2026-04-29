@@ -73,7 +73,7 @@ const LicenseTestDashboard: React.FC = () => {
 
     try {
       // Anonymous endpoint - no JWT required
-      const response = await fetch(`${API_URL}/api/v1/usage/phone-home`, {
+      const response = await fetch(`${API_URL}/api/v1/licensing/phone-home`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
