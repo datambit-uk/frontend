@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
@@ -50,6 +50,15 @@ interface AudioPerformance {
   chunking?: ChunkingInfo;
 }
 
+interface AudioWindow {
+  fake_confidence: number;
+  real_confidence: number;
+  verdict: string;
+  chunk_index: number;
+  start_sec: number;
+  end_sec: number;
+}
+
 interface AudioAnalysis {
   error: string | null;
   verdict: string;
@@ -61,6 +70,7 @@ interface AudioAnalysis {
   audio_path?: string;
   score_audio?: number;
   performance?: AudioPerformance;
+  audio_windows?: AudioWindow[];
 }
 
 interface ImageResult {
@@ -103,14 +113,44 @@ interface ReportDetailResponse {
   };
 }
 
-const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
+const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Resilient data parsing
+  const data = useMemo(() => {
+    if (!initialData) return null;
+    let d = initialData;
+    // Handle stringified JSON
+    if (typeof d === 'string') {
+      try { d = JSON.parse(d); } catch (e) { return { raw_string: d }; }
+    }
+    // Handle double nesting (e.g., { metadata_analysis: { ... } })
+    if (d && d.metadata_analysis && Object.keys(d).length === 1) {
+      d = d.metadata_analysis;
+    }
+    return d;
+  }, [initialData]);
+
+  useEffect(() => {
+    if (data) console.log('MetadataSection processed data:', data);
+  }, [data]);
+
   if (!data) return null;
 
   const verdict = data.verdict || 'UNKNOWN';
   const score = data.suspicious_score !== undefined ? data.suspicious_score : (data.score !== undefined ? data.score : 'N/A');
   const anomalies = data.top_anomalies || data.anomalies || [];
   const inconsistencies = data.top_inconsistencies || data.metadata_inconsistencies || [];
+
+  // Helper mappings for the new forensic_analysis structure
+  const forensic = data.forensic_analysis || {};
+  const hwSw = forensic.hardware_software_analysis || {};
+  const matrix = forensic.matrix_analysis || {};
+  const bitrate = forensic.bitrate_analysis || {};
+  const fps = forensic.fps_analysis || {};
+
+  const likelySource = data.forensic_summary?.likely_source || data.source_analysis?.likely_source || hwSw.likely_source || null;
+  const hwSwConfidence = data.confidence || data.forensic_summary?.hw_sw_confidence || data.source_analysis?.confidence || hwSw.confidence || 0;
 
   return (
     <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm">
@@ -146,13 +186,13 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
     <span className="text-[10px] text-gray-400 font-mono">Score: {typeof score === 'number' ? score.toFixed(4) : score}</span>
     </div>
 
-    {(data.forensic_summary || data.source_analysis) && (
+    {likelySource && (
       <div className="flex items-center gap-1 text-[10px] text-gray-400">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
-      Likely Source: <span className="text-gray-200 font-medium">{(data.forensic_summary?.likely_source || data.source_analysis?.likely_source || 'UNKNOWN')}</span>
-      <span className="opacity-60">(Conf: {(data.confidence || data.forensic_summary?.hw_sw_confidence || data.source_analysis?.confidence || 0).toFixed(2)})</span>
+      Likely Source: <span className="text-gray-200 font-medium">{likelySource}</span>
+      <span className="opacity-60">(Conf: {hwSwConfidence.toFixed(2)})</span>
       </div>
     )}
 
@@ -180,7 +220,7 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
       animate={{ opacity: 1, y: 0 }}
       className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
       >
-      {(data.file_info || data.file_hash) && (
+      {(data.file_info || data.file_hash || data.file_size) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1.5 border-b border-gray-800 pb-1">File Information</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
@@ -201,22 +241,22 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-      {(data.forensic_summary?.matrix_interpretation || data.matrix_structure) && (
+      {(data.forensic_summary?.matrix_interpretation || data.matrix_structure || matrix.interpretation) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Matrix Structure</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.matrix_interpretation || data.matrix_structure}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.matrix_interpretation || data.matrix_structure || matrix.interpretation}</p>
         </div>
       )}
-      {(data.forensic_summary?.bitrate_category || data.bitrate_analysis) && (
+      {(data.forensic_summary?.bitrate_category || data.bitrate_analysis || bitrate.bitrate_category) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Bitrate Analysis</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.bitrate_category || data.bitrate_analysis}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.bitrate_category || data.bitrate_analysis || bitrate.bitrate_category}</p>
         </div>
       )}
-      {(data.forensic_summary?.fps || data.frame_rate) && (
+      {(data.forensic_summary?.fps || data.frame_rate || fps.frame_rate) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Frame Rate</p>
-        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.fps || data.frame_rate}</p>
+        <p className="text-[10px] text-gray-300 font-mono">{data.forensic_summary?.fps || data.frame_rate || fps.frame_rate}</p>
         </div>
       )}
       </div>
@@ -230,11 +270,11 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
         </div>
       )}
 
-      {data.ffprobe && (
+      {(data.ffprobe || data.ffprobe_data) && (
         <div>
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">FFprobe (stream & format)</p>
         <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
-        {JSON.stringify(data.ffprobe, null, 2)}
+        {JSON.stringify(data.ffprobe || data.ffprobe_data, null, 2)}
         </pre>
         </div>
       )}
@@ -242,11 +282,12 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
       {(data.quantization_analysis || data.quantization_anomaly_count !== undefined) && (
         <div>
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Quantization Analysis</p>
-        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded font-mono leading-tight">
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded font-mono leading-tight scrollbar-thin scrollbar-thumb-gray-700 overflow-y-auto max-h-40">
         {data.quantization_analysis ? JSON.stringify(data.quantization_analysis, null, 2) : `Anomaly Count: ${data.quantization_anomaly_count}`}
         </pre>
         </div>
       )}
+
 
       {(data.atom_structure || data.atom_tree || data.atoms || data.atom_anomaly_count !== undefined) && (
         <div>
@@ -256,6 +297,24 @@ const MetadataSection: React.FC<{ data: any }> = ({ data }) => {
         </pre>
         </div>
       )}
+
+      {data.exif_data && (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Exif Data</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
+        {JSON.stringify(data.exif_data, null, 2)}
+        </pre>
+        </div>
+      )}
+
+      {(forensic && Object.keys(forensic).length > 0 && !data.forensic_summary) || (data && !data.file_info && !data.file_hash && !data.ffprobe_data) ? (
+        <div>
+        <p className="text-[9px] font-black text-gray-500 uppercase mb-1 ml-1">Raw Analysis Data</p>
+        <pre className="text-[9px] text-gray-400 bg-black/40 p-2 rounded max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 font-mono leading-tight">
+        {JSON.stringify(data, null, 2)}
+        </pre>
+        </div>
+      ) : null}
 
       {inconsistencies.length > 0 && (
         <div className="bg-red-900/10 border border-red-700/20 rounded p-2">
@@ -679,7 +738,13 @@ const ReportDetail: React.FC = () => {
       // Audio Analysis — shown for both audio-only and video+audio (no predicted_class for audio)
       if (hasAudioAnalysis) {
         const a = upload.result!.audio_analysis!;
-        const syntheticScore = (a as any).fake_confidence; // Audio usually only has real/fake
+
+        const avgFakeConfidence = a.audio_windows && a.audio_windows.length > 0
+          ? a.audio_windows.reduce((sum, w) => sum + w.fake_confidence, 0) / a.audio_windows.length
+          : a.fake_confidence;
+        const avgRealConfidence = a.audio_windows && a.audio_windows.length > 0
+          ? a.audio_windows.reduce((sum, w) => sum + w.real_confidence, 0) / a.audio_windows.length
+          : a.real_confidence;
 
         const isNoSpeech = a.verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
 
@@ -709,10 +774,10 @@ const ReportDetail: React.FC = () => {
             <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
             </p>
             <p className="text-xs text-gray-400">
-            Fake Confidence: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
+            Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span>
             </p>
             <p className="text-xs text-gray-400">
-            Real Confidence: <span className="text-green-300">{(a.real_confidence * 100).toFixed(2)}%</span>
+            Real Confidence: <span className="text-green-300">{(avgRealConfidence * 100).toFixed(2)}%</span>
             </p>
             <p className="text-xs text-gray-400">
             Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
