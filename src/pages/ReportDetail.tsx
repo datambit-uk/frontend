@@ -57,6 +57,11 @@ interface AudioWindow {
   chunk_index: number;
   start_sec: number;
   end_sec: number;
+  rationale?: string;
+  transcription?: string;
+  language_predicted_name?: string;
+  language_confidence?: number;
+  importance?: number;
 }
 
 interface AudioAnalysis {
@@ -71,6 +76,8 @@ interface AudioAnalysis {
   score_audio?: number;
   performance?: AudioPerformance;
   audio_windows?: AudioWindow[];
+  language_predicted_name?: string;
+  language_confidence?: number;
 }
 
 interface ImageResult {
@@ -335,7 +342,11 @@ const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
   );
 };
 
-const SuspiciousChunksTimeline: React.FC<{ chunks: SuspiciousChunk[]; duration: number }> = ({ chunks, duration }) => {
+const SuspiciousChunksTimeline: React.FC<{ 
+  chunks: SuspiciousChunk[]; 
+  duration: number;
+  audioWindows?: AudioWindow[];
+}> = ({ chunks, duration, audioWindows }) => {
   if (!chunks || chunks.length === 0) return null;
 
   const totalDuration = duration > 0 ? duration : Math.max(...chunks.map(c => c.end_sec));
@@ -357,8 +368,6 @@ const SuspiciousChunksTimeline: React.FC<{ chunks: SuspiciousChunk[]; duration: 
     </svg>
     Suspicious Segments (Ranked)
     </p>
-    <p className="text-[10px] text-gray-400 mb-2">The following time segments showed high probability of manipulation:</p>
-
     {/* Timeline bar */}
     <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
     {chunks.map((chunk) => {
@@ -386,37 +395,86 @@ const SuspiciousChunksTimeline: React.FC<{ chunks: SuspiciousChunk[]; duration: 
     <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
     </div>
 
-    {/* Chunk cards */}
-    <div className="flex flex-wrap gap-2">
+    {/* Chunk cards / details */}
+    <div className="space-y-3">
     {chunks.map((chunk) => {
       const color = rankColors[Math.min(chunk.rank - 1, rankColors.length - 1)];
+      const windowData = audioWindows?.find(w => w.chunk_index === chunk.chunk_index);
+
       return (
         <div
         key={chunk.rank}
-        className="flex-1 min-w-[120px] border rounded-lg p-2 bg-red-950/20"
-        style={{ borderColor: color + '60' }}
+        className="border rounded-lg p-3 bg-red-950/10"
+        style={{ borderColor: color + '40' }}
         >
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
         <span
-        className="text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center text-white"
+        className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white"
         style={{ backgroundColor: color }}
         >
         {chunk.rank}
         </span>
-        <span className="text-[10px] font-mono text-gray-300" style={{ color }}>
+        <span className="text-[11px] font-mono font-bold" style={{ color }}>
         {formatTime(chunk.start_sec)} – {formatTime(chunk.end_sec)}
         </span>
         </div>
-        <p className="text-[9px] text-gray-400 mb-1">
+        <div className="flex flex-col items-end">
+        <span className="text-[10px] text-gray-400">
         Confidence: <span className="font-bold text-red-400">{(chunk.fake_confidence * 100).toFixed(1)}%</span>
-        </p>
-        {/* Mini confidence bar */}
-        <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+        </span>
+        <div className="h-1 w-24 bg-gray-700 rounded-full overflow-hidden mt-1">
         <div
         className="h-full rounded-full"
         style={{ width: `${chunk.fake_confidence * 100}%`, backgroundColor: color }}
         />
         </div>
+        </div>
+        </div>
+
+        {windowData && (
+          <div className="grid grid-cols-1 gap-3 mt-2 pt-2 border-t border-gray-700/30">
+          {windowData.transcription && (
+            <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+            <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
+            "{windowData.transcription}"
+            </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {windowData.rationale && (
+            <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase mb-1 flex items-center gap-2">
+            Rationale
+            {windowData.importance !== undefined && (
+              <span className="text-orange-400 font-bold">({windowData.importance.toFixed(2)})</span>
+            )}
+            </p>
+            <p className="text-[10px] text-gray-400 leading-tight">
+            {windowData.rationale}
+            </p>
+            </div>
+          )}
+
+          {windowData.language_predicted_name && (
+            <div>
+            <div className="flex items-center gap-2">
+            <span className="text-[10px] text-blue-300 font-medium capitalize bg-blue-900/20 px-2 py-0.5 rounded border border-blue-800/30">
+            {windowData.language_predicted_name}
+            </span>
+            {windowData.language_confidence && (
+              <span className="text-[9px] text-gray-500 font-mono">
+              ({(windowData.language_confidence * 100).toFixed(1)}%)
+              </span>
+            )}
+            </div>
+            </div>
+          )}
+          </div>
+          </div>
+        )}
         </div>
       );
     })}
@@ -782,12 +840,20 @@ const ReportDetail: React.FC = () => {
             <p className="text-xs text-gray-400">
             Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
             </p>
-            <p className="text-xs text-gray-400">
-            Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
-            </p>
+            {a.avg_inference_ms !== undefined && (
+              <p className="text-xs text-gray-400">
+              Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+              </p>
+            )}
             {a.duration !== undefined && (
               <p className="text-xs text-gray-400">
               Audio Duration: <span className="text-gray-300">{a.duration.toFixed(2)}s</span>
+              </p>
+            )}
+            {a.language_predicted_name && (
+              <p className="text-xs text-gray-400">
+              Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name}</span>
+              {a.language_confidence && <span className="opacity-60 ml-1">(Conf: {(a.language_confidence * 100).toFixed(1)}%)</span>}
               </p>
             )}
             {a.error && (
@@ -802,6 +868,7 @@ const ReportDetail: React.FC = () => {
                 <SuspiciousChunksTimeline
                 chunks={a.performance.chunking.top_suspicious_chunks}
                 duration={a.duration ?? 0}
+                audioWindows={a.audio_windows}
                 />
               )}
               </>
