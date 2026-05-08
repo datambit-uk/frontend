@@ -357,8 +357,13 @@ const SuspiciousChunksTimeline: React.FC<{
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Rank colours: rank 1 = most suspicious (darker red), rest lighter
   const rankColors = ['#dc2626', '#ef4444', '#f87171'];
+  
+  const topChunk = chunks.find(c => c.rank === 1) || chunks[0];
+  const rationaleWindows = audioWindows?.filter(w => w.rationale) || [];
+  const topImportanceWindow = rationaleWindows.length > 0 
+    ? rationaleWindows.reduce((prev, curr) => (curr.importance || 0) > (prev.importance || 0) ? curr : prev)
+    : undefined;
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-700/40">
@@ -366,30 +371,24 @@ const SuspiciousChunksTimeline: React.FC<{
     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
-    Suspicious Segments (Ranked)
+    Top Analysis Findings
     </p>
     {/* Timeline bar */}
     <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
-    {chunks.map((chunk) => {
-      const left = (chunk.start_sec / totalDuration) * 100;
-      const width = ((chunk.end_sec - chunk.start_sec) / totalDuration) * 100;
-      const color = rankColors[Math.min(chunk.rank - 1, rankColors.length - 1)];
-      return (
-        <div
-        key={chunk.rank}
-        className="absolute top-0 h-full flex items-center justify-center"
-        style={{
-          left: `${left}%`,
-          width: `${width}%`,
-          backgroundColor: color,
-          opacity: 0.8,
-        }}
-        title={`#${chunk.rank}: ${formatTime(chunk.start_sec)}–${formatTime(chunk.end_sec)} (${(chunk.fake_confidence * 100).toFixed(1)}%)`}
-        >
-        <span className="text-[9px] font-bold text-white drop-shadow">{chunk.rank}</span>
-        </div>
-      );
-    })}
+    {topChunk && (
+      <div
+      className="absolute top-0 h-full flex items-center justify-center"
+      style={{
+        left: `${(topChunk.start_sec / totalDuration) * 100}%`,
+        width: `${((topChunk.end_sec - topChunk.start_sec) / totalDuration) * 100}%`,
+        backgroundColor: rankColors[0],
+        opacity: 0.8,
+      }}
+      title={`Top Suspicious: ${formatTime(topChunk.start_sec)}–${formatTime(topChunk.end_sec)} (${(topChunk.fake_confidence * 100).toFixed(1)}%)`}
+      >
+      <span className="text-[9px] font-bold text-white drop-shadow">1</span>
+      </div>
+    )}
     {/* Start / end labels */}
     <span className="absolute left-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">0:00</span>
     <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
@@ -397,38 +396,30 @@ const SuspiciousChunksTimeline: React.FC<{
 
     {/* Chunk cards / details */}
     <div className="space-y-3">
-    {chunks.map((chunk) => {
-      const color = rankColors[Math.min(chunk.rank - 1, rankColors.length - 1)];
-      const windowData = audioWindows?.find(w => w.chunk_index === chunk.chunk_index);
+    {/* 1. Top Suspicious Chunk */}
+    {topChunk && (() => {
+      const windowData = audioWindows?.find(w => w.chunk_index === topChunk.chunk_index);
 
       return (
         <div
-        key={chunk.rank}
-        className="border rounded-lg p-3 bg-red-950/10"
-        style={{ borderColor: color + '40' }}
+        key="top-suspicious"
+        className="border rounded-lg p-3 bg-red-950/10 border-red-600/40"
         >
         <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
         <span
-        className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white"
-        style={{ backgroundColor: color }}
+        className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white bg-red-600"
         >
-        {chunk.rank}
+        1
         </span>
-        <span className="text-[11px] font-mono font-bold" style={{ color }}>
-        {formatTime(chunk.start_sec)} – {formatTime(chunk.end_sec)}
+        <span className="text-[11px] font-mono font-bold text-red-400">
+        {formatTime(topChunk.start_sec)} – {formatTime(topChunk.end_sec)}
         </span>
         </div>
         <div className="flex flex-col items-end">
         <span className="text-[10px] text-gray-400">
-        Confidence: <span className="font-bold text-red-400">{(chunk.fake_confidence * 100).toFixed(1)}%</span>
+        Top Suspicious: <span className="font-bold text-red-400">{(topChunk.fake_confidence * 100).toFixed(1)}%</span>
         </span>
-        <div className="h-1 w-24 bg-gray-700 rounded-full overflow-hidden mt-1">
-        <div
-        className="h-full rounded-full"
-        style={{ width: `${chunk.fake_confidence * 100}%`, backgroundColor: color }}
-        />
-        </div>
         </div>
         </div>
 
@@ -457,27 +448,55 @@ const SuspiciousChunksTimeline: React.FC<{
             </p>
             </div>
           )}
-
-          {windowData.language_predicted_name && (
-            <div>
-            <div className="flex items-center gap-2">
-            <span className="text-[10px] text-blue-300 font-medium capitalize bg-blue-900/20 px-2 py-0.5 rounded border border-blue-800/30">
-            {windowData.language_predicted_name}
-            </span>
-            {windowData.language_confidence && (
-              <span className="text-[9px] text-gray-500 font-mono">
-              ({(windowData.language_confidence * 100).toFixed(1)}%)
-              </span>
-            )}
-            </div>
-            </div>
-          )}
           </div>
           </div>
         )}
         </div>
       );
-    })}
+    })()}
+
+    {/* 2. Top Importance Rationale (if different from top chunk) */}
+    {topImportanceWindow && (!topChunk || topImportanceWindow.chunk_index !== topChunk.chunk_index) && (
+        <div
+        key="top-importance"
+        className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10"
+        >
+        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider">Key Forensic Rationale</span>
+        </div>
+        <div className="flex flex-col items-end">
+        <span className="text-[10px] text-orange-400 font-bold">
+        Importance: {topImportanceWindow.importance?.toFixed(2)}
+        </span>
+        </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 mt-2 pt-2 border-t border-orange-700/20">
+          <p className="text-[11px] font-mono text-gray-400">
+            Time: {formatTime(topImportanceWindow.start_sec)} – {formatTime(topImportanceWindow.end_sec)}
+          </p>
+          {topImportanceWindow.transcription && (
+            <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+            <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
+            "{topImportanceWindow.transcription}"
+            </p>
+            </div>
+          )}
+          {topImportanceWindow.rationale && (
+            <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase mb-1 flex items-center gap-2">
+            Rationale
+            </p>
+            <p className="text-[10px] text-gray-400 leading-tight">
+            {topImportanceWindow.rationale}
+            </p>
+            </div>
+          )}
+        </div>
+        </div>
+    )}
     </div>
     </div>
   );
@@ -880,18 +899,12 @@ const ReportDetail: React.FC = () => {
       const hasMetadata = !!upload.result?.metadata_analysis;
 
       return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-6">
 
         {/* Main layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        {/* LEFT: Video + Audio stacked */}
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {videoBlock}
         {audioBlock}
-        </div>
-
-        {/* RIGHT: Metadata */}
         {hasMetadata && (
           <div className="h-full">
           <MetadataSection data={upload.result!.metadata_analysis} />
@@ -1027,62 +1040,45 @@ const ReportDetail: React.FC = () => {
         >
         <div className="h-full overflow-hidden rounded-2xl">
         <div className="h-full overflow-y-auto">
-        {/* Desktop Table View */}
-        <div className="hidden md:block">
-        <table className="min-w-full divide-y divide-gray-700/50">
-        <thead className="sticky top-0 bg-gray-800/95 backdrop-blur-sm z-10">
-        <tr>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-        Filename
-        </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-        File Status
-        </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-        Result
-        </th>
-        </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-700/50">
+        {/* Desktop List View */}
+        <div className="hidden md:block p-6">
+        <div className="space-y-8">
         {data.map((upload, index) => (
-          <motion.tr
+          <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: index * 0.05 }}
           key={index}
-          className="hover:bg-gray-700/20 transition-all duration-200"
+          className="bg-gray-800/40 backdrop-blur-md rounded-2xl border border-gray-700/50 overflow-hidden shadow-xl"
           >
-          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">
-          <div className="relative group">
-          <div className="max-w-[500px] truncate">
-          {upload.file_metadata.filename}
+          {/* Top Line: Filename & Status */}
+          <div className="flex items-center justify-between px-6 py-4 bg-gray-800/60 border-b border-gray-700/50">
+          <div className="flex items-center gap-4 min-w-0">
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest whitespace-nowrap">File Info</span>
+          <div className="h-4 w-px bg-gray-700" />
+          <span className="text-sm font-bold text-blue-400 truncate max-w-2xl">{upload.file_metadata.filename}</span>
+          <span className="text-[10px] text-gray-500 font-mono">({formatFileSize(upload.file_metadata.size)})</span>
           </div>
-          {upload.file_metadata.filename.length > 25 && (
-            <div className="absolute left-0 -top-8 scale-0 transition-all rounded bg-gray-800 p-2 text-xs text-gray-100 group-hover:scale-100 whitespace-nowrap z-20">
-            {upload.file_metadata.filename}
-            </div>
-          )}
-          </div>
-          </td>
-          <td className="px-6 py-4 whitespace-nowrap">
+
+          <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="flex items-center gap-3">
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Status</span>
           <motion.span
           whileHover={{ scale: 1.05 }}
-          className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
+          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
             upload.file_status === 'complete'
-            ? 'bg-green-900/50 text-green-400'
+            ? 'bg-green-900/40 text-green-400 border border-green-700/30'
             : upload.file_status === 'pending'
-            ? 'bg-yellow-900/50 text-yellow-400'
+            ? 'bg-yellow-900/40 text-yellow-400 border border-yellow-700/30'
             : upload.file_status === 'processing'
-            ? 'bg-blue-900/50 text-blue-400'
-            : 'bg-red-900/50 text-red-400'
+            ? 'bg-blue-900/40 text-blue-400 border border-blue-700/30'
+            : 'bg-red-900/40 text-red-400 border border-red-700/30'
           }`}
           >
           {upload.file_status}
           </motion.span>
-          </td>
-          <td className="px-6 py-4 text-sm text-gray-300">
-          <div className="flex justify-between items-center gap-2">
-          <div>{formatResult(upload)}</div>
+          </div>
+
           {upload.result && (upload.result.heatmap_url || upload.result.heatmap_paths) && (upload.result.heatmap_url?.length || upload.result.heatmap_paths?.length) && (
             <button
             onClick={() => {
@@ -1095,7 +1091,7 @@ const ReportDetail: React.FC = () => {
                   heatmap_urls: upload.result.heatmap_url || upload.result.heatmap_paths,
                   label_audio: upload.result.audio_analysis?.verdict || null,
                   score_audio: upload.result.audio_analysis?.score_audio || null,
-                  label_video: upload.result.video_analysis?.verdict || null, // Changed from predicted_class to verdict
+                  label_video: upload.result.video_analysis?.verdict || null,
                   score_video: upload.result.video_analysis?.score_video || null,
                   label_image: upload.result.image_result?.label_image || null,
                   score_image: upload.result.image_result?.score_image || null
@@ -1103,26 +1099,24 @@ const ReportDetail: React.FC = () => {
                 navigate('/analysis', { state: analysisData });
               }
             }}
-            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="View Heatmap"
+            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg border border-blue-500/30 transition-all text-[11px] font-bold uppercase tracking-wider"
             >
-            <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            >
+            View Heatmap
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
             </button>
           )}
           </div>
-          </td>
-          </motion.tr>
+          </div>
+
+          {/* Result Content */}
+          <div className="p-6">
+          {formatResult(upload)}
+          </div>
+          </motion.div>
         ))}
-        </tbody>
-        </table>
+        </div>
         </div>
 
         {/* Mobile Card View */}

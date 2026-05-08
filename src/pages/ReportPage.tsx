@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 // import { apiCall } from "../api/api";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -46,6 +46,7 @@ const formatDateTime = (isoString: string) => {
 };
 
 const Report: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<ReportEntry[]>([]);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -311,7 +312,7 @@ const Report: React.FC = () => {
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="text-gray-400 text-lg mb-4">No uploads made in the last 24 hours.</div>
                   <button
-                    onClick={() => window.location.href = '/'}
+                    onClick={() => navigate('/home')}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow text-sm font-semibold transition-all"
                   >
                     Click to upload
