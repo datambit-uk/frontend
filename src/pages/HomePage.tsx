@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Video, Copy, Check, X } from "lucide-react";
+import { Video, Copy, Check, X, AlertTriangle } from "lucide-react";
 import Dropbox from "../components/Dropbox";
+import { MAINTENANCE_MODE } from "../config/maintenance";
 
 interface UploadResponse {
   code: string;
@@ -10,7 +11,7 @@ interface UploadResponse {
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const showDropbox = true;
+  const showDropbox = !MAINTENANCE_MODE.isUploadDisabled;
   const selectedCard = "Media";
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -29,7 +30,6 @@ const Home: React.FC = () => {
   const [countdown, setCountdown] = useState(2);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const API_URL = "https://production.datambit.com";
-
   // Redirect to report page after successful upload
   useEffect(() => {
     if (responseMessage.status === "success" && responseMessage.uploadId) {
@@ -78,6 +78,11 @@ const Home: React.FC = () => {
   };
 
   const uploadFiles = async () => {
+    if (MAINTENANCE_MODE.isUploadDisabled) {
+      alert(MAINTENANCE_MODE.message);
+      return;
+    }
+
     if (!selectedCard || files.length === 0) {
       alert("Please select files to upload first.");
       return;
@@ -245,6 +250,20 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
+    {MAINTENANCE_MODE.isUploadDisabled && (
+      <div className="bg-amber-900/40 border border-amber-500/50 rounded-2xl p-6 flex items-start gap-4 backdrop-blur-sm">
+        <div className="p-2 bg-amber-500/20 rounded-lg">
+          <AlertTriangle className="w-6 h-6 text-amber-500" />
+        </div>
+        <div>
+          <h3 className="text-amber-500 font-bold text-lg">Uploads Temporarily Disabled</h3>
+          <p className="text-amber-200/80 mt-1">
+            {MAINTENANCE_MODE.message}
+          </p>
+        </div>
+      </div>
+    )}
+
     {showDropbox && (
       <div className="space-y-4">
       {/*

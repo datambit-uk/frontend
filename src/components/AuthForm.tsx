@@ -533,7 +533,7 @@ const AuthForm: React.FC<AuthFormProps> = ({
     transition={{ delay: 0.3, duration: 0.5 }}
     className="mt-4 text-2xl font-bold text-white"
     >
-    {isRegisterForm ? 'Create Account' : 'Welcome to Genui!'}
+    {isRegisterForm ? 'Create Account' : 'Welcome to Shield Core!'}
     </motion.h1>
     <motion.p
     initial={{ y: 10, opacity: 0 }}

@@ -64,6 +64,21 @@ interface AudioWindow {
   importance?: number;
 }
 
+interface AudioHighlight {
+  start_sec: number;
+  end_sec: number;
+  verdict: string;
+  transcription?: string;
+  fake_confidence?: number;
+  importance_rationale?: string;
+  chunk_index?: number;
+}
+
+interface AudioHighlights {
+  primary_alert?: AudioHighlight;
+  technical_proof?: AudioHighlight;
+}
+
 interface AudioAnalysis {
   error: string | null;
   verdict: string;
@@ -75,9 +90,16 @@ interface AudioAnalysis {
   audio_path?: string;
   score_audio?: number;
   performance?: AudioPerformance;
+  performance_metrics?: AudioPerformance;
   audio_windows?: AudioWindow[];
+  suspicious_chunks?: SuspiciousChunk[];
+  audio_highlights?: AudioHighlights;
   language_predicted_name?: string;
   language_confidence?: number;
+  final_audio_verdict?: string;
+  final_audio_fake_confidence?: number;
+  final_audio_real_confidence?: number;
+  audio_prediction_raw?: any;
 }
 
 interface ImageResult {
@@ -346,10 +368,9 @@ const SuspiciousChunksTimeline: React.FC<{
   chunks: SuspiciousChunk[]; 
   duration: number;
   audioWindows?: AudioWindow[];
-}> = ({ chunks, duration, audioWindows }) => {
-  if (!chunks || chunks.length === 0) return null;
-
-  const totalDuration = duration > 0 ? duration : Math.max(...chunks.map(c => c.end_sec));
+  highlights?: AudioHighlights;
+}> = ({ chunks, duration, audioWindows, highlights }) => {
+  const totalDuration = duration > 0 ? duration : (chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0);
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -357,13 +378,18 @@ const SuspiciousChunksTimeline: React.FC<{
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const rankColors = ['#dc2626', '#ef4444', '#f87171'];
-  
+  const primary = highlights?.primary_alert;
+  const technical = highlights?.technical_proof;
+
+  // Fallback to top chunk if no highlights
   const topChunk = chunks.find(c => c.rank === 1) || chunks[0];
+  
   const rationaleWindows = audioWindows?.filter(w => w.rationale) || [];
   const topImportanceWindow = rationaleWindows.length > 0 
     ? rationaleWindows.reduce((prev, curr) => (curr.importance || 0) > (prev.importance || 0) ? curr : prev)
     : undefined;
+
+  if (!primary && !technical && (!chunks || chunks.length === 0)) return null;
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-700/40">
@@ -371,20 +397,52 @@ const SuspiciousChunksTimeline: React.FC<{
     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
-    Top Analysis Findings
+    Analysis Highlights
     </p>
+    
     {/* Timeline bar */}
     <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
-    {topChunk && (
+    {primary && (
+      <div
+      className="absolute top-0 h-full flex items-center justify-center border-r border-black/20"
+      style={{
+        left: `${(primary.start_sec / totalDuration) * 100}%`,
+        width: `${((primary.end_sec - primary.start_sec) / totalDuration) * 100}%`,
+        backgroundColor: '#dc2626',
+        opacity: 0.8,
+        zIndex: 2,
+      }}
+      title={`Crucial Window: ${formatTime(primary.start_sec)}–${formatTime(primary.end_sec)}`}
+      >
+      <span className="text-[8px] font-black text-white uppercase px-1">Requires Immediate Review</span>
+      </div>
+    )}
+    {technical && (
+      <div
+      className="absolute top-0 h-full flex items-center justify-center opacity-60"
+      style={{
+        left: `${(technical.start_sec / totalDuration) * 100}%`,
+        width: `${((technical.end_sec - technical.start_sec) / totalDuration) * 100}%`,
+        backgroundColor: '#7c3aed',
+        zIndex: 1,
+      }}
+      title={`Forensic Proof: ${formatTime(technical.start_sec)}–${formatTime(technical.end_sec)}`}
+      >
+      {/* If it doesn't overlap perfectly with primary, show a label */}
+      {(!primary || primary.start_sec !== technical.start_sec) && (
+        <span className="text-[8px] font-black text-white uppercase px-1">Proof</span>
+      )}
+      </div>
+    )}
+    {!primary && !technical && topChunk && (
       <div
       className="absolute top-0 h-full flex items-center justify-center"
       style={{
         left: `${(topChunk.start_sec / totalDuration) * 100}%`,
         width: `${((topChunk.end_sec - topChunk.start_sec) / totalDuration) * 100}%`,
-        backgroundColor: rankColors[0],
+        backgroundColor: '#dc2626',
         opacity: 0.8,
       }}
-      title={`Top Suspicious: ${formatTime(topChunk.start_sec)}–${formatTime(topChunk.end_sec)} (${(topChunk.fake_confidence * 100).toFixed(1)}%)`}
       >
       <span className="text-[9px] font-bold text-white drop-shadow">1</span>
       </div>
@@ -394,107 +452,114 @@ const SuspiciousChunksTimeline: React.FC<{
     <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
     </div>
 
-    {/* Chunk cards / details */}
+    {/* Details Cards */}
     <div className="space-y-3">
-    {/* 1. Top Suspicious Chunk */}
-    {topChunk && (() => {
-      const windowData = audioWindows?.find(w => w.chunk_index === topChunk.chunk_index);
-
-      return (
-        <div
-        key="top-suspicious"
-        className="border rounded-lg p-3 bg-red-950/10 border-red-600/40"
-        >
+    {/* 1. Primary Alert */}
+    {primary && (
+      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40">
         <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-        <span
-        className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white bg-red-600"
-        >
-        1
-        </span>
-        <span className="text-[11px] font-mono font-bold text-red-400">
-        {formatTime(topChunk.start_sec)} – {formatTime(topChunk.end_sec)}
-        </span>
-        </div>
-        <div className="flex flex-col items-end">
-        <span className="text-[10px] text-gray-400">
-        Top Suspicious: <span className="font-bold text-red-400">{(topChunk.fake_confidence * 100).toFixed(1)}%</span>
-        </span>
-        </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Primary Alert</span>
+            <span className="text-[11px] font-mono font-bold text-red-400">
+              {formatTime(primary.start_sec)} – {formatTime(primary.end_sec)}
+            </span>
+          </div>
+          {primary.fake_confidence !== undefined && (
+            <span className="text-[10px] text-gray-400">
+              Confidence: <span className="font-bold text-red-400">{(primary.fake_confidence * 100).toFixed(1)}%</span>
+            </span>
+          )}
         </div>
 
-        {windowData && (
-          <div className="grid grid-cols-1 gap-3 mt-2 pt-2 border-t border-gray-700/30">
-          {windowData.transcription && (
+        <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
+          {primary.importance_rationale && (
             <div>
-            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-            <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
-            "{windowData.transcription}"
-            </p>
+              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Forensic Rationale</p>
+              <p className="text-[10px] text-gray-400 leading-tight">
+                {primary.importance_rationale}
+              </p>
             </div>
           )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {windowData.rationale && (
-            <div>
-            <p className="text-[9px] font-black text-gray-500 uppercase mb-1 flex items-center gap-2">
-            Rationale
-            {windowData.importance !== undefined && (
-              <span className="text-orange-400 font-bold">({windowData.importance.toFixed(2)})</span>
-            )}
-            </p>
-            <p className="text-[10px] text-gray-400 leading-tight">
-            {windowData.rationale}
-            </p>
-            </div>
-          )}
-          </div>
-          </div>
-        )}
         </div>
-      );
-    })()}
+      </div>
+    )}
 
-    {/* 2. Top Importance Rationale (if different from top chunk) */}
-    {topImportanceWindow && (!topChunk || topImportanceWindow.chunk_index !== topChunk.chunk_index) && (
-        <div
-        key="top-importance"
-        className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10"
-        >
+    {/* 2. Technical Proof */}
+    {technical && (
+      <div className="border rounded-lg p-3 bg-purple-950/10 border-purple-600/40">
         <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-        <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider">Key Forensic Rationale</span>
-        </div>
-        <div className="flex flex-col items-end">
-        <span className="text-[10px] text-orange-400 font-bold">
-        Importance: {topImportanceWindow.importance?.toFixed(2)}
-        </span>
-        </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Technical Proof</span>
+            <span className="text-[11px] font-mono font-bold text-purple-400">
+              {formatTime(technical.start_sec)} – {formatTime(technical.end_sec)}
+            </span>
+          </div>
+          {technical.fake_confidence !== undefined && (
+            <span className="text-[10px] text-gray-400">
+              Confidence: <span className="font-bold text-purple-400">{(technical.fake_confidence * 100).toFixed(1)}%</span>
+            </span>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 mt-2 pt-2 border-t border-orange-700/20">
-          <p className="text-[11px] font-mono text-gray-400">
-            Time: {formatTime(topImportanceWindow.start_sec)} – {formatTime(topImportanceWindow.end_sec)}
-          </p>
-          {topImportanceWindow.transcription && (
+        <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
+          {technical.transcription && (
             <div>
-            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-            <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
-            "{topImportanceWindow.transcription}"
-            </p>
-            </div>
-          )}
-          {topImportanceWindow.rationale && (
-            <div>
-            <p className="text-[9px] font-black text-gray-500 uppercase mb-1 flex items-center gap-2">
-            Rationale
-            </p>
-            <p className="text-[10px] text-gray-400 leading-tight">
-            {topImportanceWindow.rationale}
-            </p>
+              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+              <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
+                "{technical.transcription}"
+              </p>
             </div>
           )}
         </div>
+      </div>
+    )}
+
+    {/* Fallback to Top Suspicious Chunk if no highlights */}
+    {!primary && !technical && topChunk && (
+      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white bg-red-600">1</span>
+            <span className="text-[11px] font-mono font-bold text-red-400">
+              {formatTime(topChunk.start_sec)} – {formatTime(topChunk.end_sec)}
+            </span>
+          </div>
+          <span className="text-[10px] text-gray-400">
+            Top Suspicious: <span className="font-bold text-red-400">{(topChunk.fake_confidence * 100).toFixed(1)}%</span>
+          </span>
+        </div>
+        {audioWindows?.find(w => w.chunk_index === topChunk.chunk_index) && (() => {
+          const w = audioWindows.find(win => win.chunk_index === topChunk.chunk_index);
+          return (
+            <div className="mt-2 pt-2 border-t border-gray-700/30">
+              {w?.transcription && (
+                <div className="mb-2">
+                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+                  <p className="text-[11px] text-gray-300 italic bg-black/20 p-2 rounded border border-gray-800/30">"{w.transcription}"</p>
+                </div>
+              )}
+              {w?.rationale && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Rationale</p>
+                  <p className="text-[10px] text-gray-400">{w.rationale}</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+    )}
+
+    {/* Importance Rationale (Key Forensic Rationale) - Keep this as additional context if available */}
+    {topImportanceWindow && (!primary || topImportanceWindow.start_sec !== primary.start_sec) && (!technical || topImportanceWindow.start_sec !== technical.start_sec) && (!topChunk || topImportanceWindow.chunk_index !== topChunk.chunk_index) && (
+        <div className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider">Additional Forensic Insight</span>
+            <span className="text-[10px] text-orange-400 font-bold">Importance: {topImportanceWindow.importance?.toFixed(2)}</span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-orange-700/20">
+            <p className="text-[10px] text-gray-400 leading-tight">{topImportanceWindow.rationale}</p>
+          </div>
         </div>
     )}
     </div>
@@ -816,14 +881,22 @@ const ReportDetail: React.FC = () => {
       if (hasAudioAnalysis) {
         const a = upload.result!.audio_analysis!;
 
+        // Resilient field extraction with fallbacks for new structure
+        const verdict = a.verdict || a.final_audio_verdict || 'UNKNOWN';
+        const fakeConf = a.fake_confidence ?? a.final_audio_fake_confidence ?? 0;
+        const realConf = a.real_confidence ?? a.final_audio_real_confidence ?? 0;
+        const procTime = a.processing_time ?? a.audio_prediction_raw?.processing_time ?? 0;
+        const avgInf = a.avg_inference_ms ?? a.audio_prediction_raw?.avg_inference_ms ?? 0;
+        const duration = a.duration ?? a.audio_prediction_raw?.duration ?? 0;
+
         const avgFakeConfidence = a.audio_windows && a.audio_windows.length > 0
           ? a.audio_windows.reduce((sum, w) => sum + w.fake_confidence, 0) / a.audio_windows.length
-          : a.fake_confidence;
+          : fakeConf;
         const avgRealConfidence = a.audio_windows && a.audio_windows.length > 0
           ? a.audio_windows.reduce((sum, w) => sum + w.real_confidence, 0) / a.audio_windows.length
-          : a.real_confidence;
+          : realConf;
 
-        const isNoSpeech = a.verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
+        const isNoSpeech = verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
 
         audioBlock = (
           <div key="audio-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
@@ -838,9 +911,9 @@ const ReportDetail: React.FC = () => {
             <p className="text-xs text-yellow-600 mt-1">
             The audio track contains no detectable speech and could not be analysed. The file may be silent or contain only background noise.
             </p>
-            {a.processing_time !== undefined && (
+            {procTime > 0 && (
               <p className="text-xs text-gray-400 mt-1">
-              Processing Time: <span className="text-gray-300">{a.processing_time.toFixed(2)}s</span>
+              Processing Time: <span className="text-gray-300">{procTime.toFixed(2)}s</span>
               </p>
             )}
             </>
@@ -848,7 +921,7 @@ const ReportDetail: React.FC = () => {
             <>
             <p className="text-xs text-gray-400">
             Verdict:{' '}
-            <span className={getLabelColor(a.verdict)}>{capitalizeFirst(a.verdict)}</span>
+            <span className={getLabelColor(verdict)}>{capitalizeFirst(verdict)}</span>
             </p>
             <p className="text-xs text-gray-400">
             Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span>
@@ -857,22 +930,22 @@ const ReportDetail: React.FC = () => {
             Real Confidence: <span className="text-green-300">{(avgRealConfidence * 100).toFixed(2)}%</span>
             </p>
             <p className="text-xs text-gray-400">
-            Processing Time: <span className="text-gray-300">{a.processing_time?.toFixed(2) ?? 'N/A'}s</span>
+            Processing Time: <span className="text-gray-300">{procTime > 0 ? procTime.toFixed(2) : 'N/A'}s</span>
             </p>
-            {a.avg_inference_ms !== undefined && (
+            {avgInf > 0 && (
               <p className="text-xs text-gray-400">
-              Avg Inference: <span className="text-gray-300">{a.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
+              Avg Inference: <span className="text-gray-300">{avgInf.toFixed(2)} ms</span>
               </p>
             )}
-            {a.duration !== undefined && (
+            {duration > 0 && (
               <p className="text-xs text-gray-400">
-              Audio Duration: <span className="text-gray-300">{a.duration.toFixed(2)}s</span>
+              Audio Duration: <span className="text-gray-300">{duration.toFixed(2)}s</span>
               </p>
             )}
-            {a.language_predicted_name && (
+            {(a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name) && (
               <p className="text-xs text-gray-400">
-              Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name}</span>
-              {a.language_confidence && <span className="opacity-60 ml-1">(Conf: {(a.language_confidence * 100).toFixed(1)}%)</span>}
+              Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name}</span>
+              {(a.language_confidence || a.audio_prediction_raw?.language_confidence) && <span className="opacity-60 ml-1">(Conf: {((a.language_confidence || a.audio_prediction_raw?.language_confidence) * 100).toFixed(1)}%)</span>}
               </p>
             )}
             {a.error && (
@@ -880,14 +953,14 @@ const ReportDetail: React.FC = () => {
               Error: {a.error}
               </p>
             )}
-            {/* Suspicious chunks timeline — only when chunking is enabled */}
-            {a.performance?.chunking?.enabled &&
-              a.performance.chunking.top_suspicious_chunks &&
-              a.performance.chunking.top_suspicious_chunks.length > 0 && (
+            {/* Suspicious chunks timeline — handles both performance, performance_metrics, and audio_highlights structures */}
+            {((a.performance?.chunking?.enabled || a.performance_metrics?.chunking?.enabled || a.audio_highlights || a.audio_prediction_raw?.highlights) &&
+               (a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || a.audio_highlights || a.audio_prediction_raw?.highlights)) && (
                 <SuspiciousChunksTimeline
-                chunks={a.performance.chunking.top_suspicious_chunks}
-                duration={a.duration ?? 0}
+                chunks={a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || []}
+                duration={duration}
                 audioWindows={a.audio_windows}
+                highlights={a.audio_highlights || a.audio_prediction_raw?.highlights}
                 />
               )}
               </>
@@ -936,9 +1009,10 @@ const ReportDetail: React.FC = () => {
           if (result.image_result.label_image.toLowerCase() === "real") totalReal++;
           if (result.image_result.label_image.toLowerCase() === "fake") totalFake++;
         }
-        if (result.audio_analysis && result.audio_analysis.verdict) {
-          if (result.audio_analysis.verdict.toLowerCase() === "real") totalReal++;
-          if (result.audio_analysis.verdict.toLowerCase() === "fake") totalFake++;
+        const audioVerdict = result.audio_analysis?.verdict || result.audio_analysis?.final_audio_verdict;
+        if (audioVerdict) {
+          if (audioVerdict.toLowerCase() === "real") totalReal++;
+          if (audioVerdict.toLowerCase() === "fake") totalFake++;
         }
         if (result.video_analysis && result.video_analysis.verdict) {
           if (result.video_analysis.verdict.toLowerCase() === "real") totalReal++;
@@ -1078,35 +1152,6 @@ const ReportDetail: React.FC = () => {
           {upload.file_status}
           </motion.span>
           </div>
-
-          {upload.result && (upload.result.heatmap_url || upload.result.heatmap_paths) && (upload.result.heatmap_url?.length || upload.result.heatmap_paths?.length) && (
-            <button
-            onClick={() => {
-              if (upload.result) {
-                const analysisData = {
-                  upload_id: uploadId,
-                  filename: upload.file_metadata.filename,
-                  content_type: upload.file_metadata.content_type,
-                  size: upload.file_metadata.size,
-                  heatmap_urls: upload.result.heatmap_url || upload.result.heatmap_paths,
-                  label_audio: upload.result.audio_analysis?.verdict || null,
-                  score_audio: upload.result.audio_analysis?.score_audio || null,
-                  label_video: upload.result.video_analysis?.verdict || null,
-                  score_video: upload.result.video_analysis?.score_video || null,
-                  label_image: upload.result.image_result?.label_image || null,
-                  score_image: upload.result.image_result?.score_image || null
-                };
-                navigate('/analysis', { state: analysisData });
-              }
-            }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg border border-blue-500/30 transition-all text-[11px] font-bold uppercase tracking-wider"
-            >
-            View Heatmap
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            </button>
-          )}
           </div>
           </div>
 
@@ -1165,43 +1210,6 @@ const ReportDetail: React.FC = () => {
           <div>
           <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
           Result
-          </div>
-          <div className="flex justify-between items-start gap-2">
-          <div className="flex-1">{formatResult(upload)}</div>
-          {upload.result && (upload.result.heatmap_url || upload.result.heatmap_paths) && (upload.result.heatmap_url?.length || upload.result.heatmap_paths?.length) && (
-            <button
-            onClick={() => {
-              if (upload.result) {
-                const analysisData = {
-                  upload_id: uploadId,
-                  filename: upload.file_metadata.filename,
-                  content_type: upload.file_metadata.content_type,
-                  size: upload.file_metadata.size,
-                  heatmap_urls: upload.result.heatmap_url || upload.result.heatmap_paths,
-                  label_audio: upload.result.audio_analysis?.verdict || null,
-                  score_audio: upload.result.audio_analysis?.score_audio || null,
-                  label_video: upload.result.video_analysis?.verdict || null,
-                  score_video: upload.result.video_analysis?.score_video || null,
-                  label_image: upload.result.image_result?.label_image || null,
-                  score_image: upload.result.image_result?.score_image || null
-                };
-                navigate('/analysis', { state: analysisData });
-              }
-            }}
-            className="p-2 text-blue-400 hover:text-blue-300 hover:bg-gray-700/50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            aria-label="View Heatmap"
-            >
-            <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            </button>
-          )}
           </div>
           </div>
           </motion.div>
