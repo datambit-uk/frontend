@@ -62,6 +62,9 @@ interface AudioWindow {
   language_predicted_name?: string;
   language_confidence?: number;
   importance?: number;
+  importance_score?: number;
+  importance_label?: string;
+  importance_rationale?: string;
 }
 
 interface AudioHighlight {
@@ -79,6 +82,18 @@ interface AudioHighlights {
   technical_proof?: AudioHighlight;
 }
 
+interface RealWindowInsight {
+  chunk_index?: number;
+  start_sec: number;
+  end_sec: number;
+  verdict?: string;
+  transcription?: string;
+  importance_label?: string;
+  importance_score?: number;
+  importance_rationale?: string;
+  real_confidence?: number;
+}
+
 interface AudioAnalysis {
   error: string | null;
   verdict: string;
@@ -94,6 +109,7 @@ interface AudioAnalysis {
   audio_windows?: AudioWindow[];
   suspicious_chunks?: SuspiciousChunk[];
   audio_highlights?: AudioHighlights;
+  real_window_insights?: RealWindowInsight[];
   language_predicted_name?: string;
   language_confidence?: number;
   final_audio_verdict?: string;
@@ -369,8 +385,14 @@ const SuspiciousChunksTimeline: React.FC<{
   duration: number;
   audioWindows?: AudioWindow[];
   highlights?: AudioHighlights;
-}> = ({ chunks, duration, audioWindows, highlights }) => {
-  const totalDuration = duration > 0 ? duration : (chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0);
+  realInsights?: RealWindowInsight[];
+}> = ({ chunks, duration, audioWindows, highlights, realInsights }) => {
+  const [showAllRealInsights, setShowAllRealInsights] = useState(false);
+  const hasRealInsights = (realInsights?.length ?? 0) > 0;
+  const maxChunkEnd = chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0;
+  const maxRealInsightEnd = hasRealInsights ? Math.max(...(realInsights || []).map(r => r.end_sec)) : 0;
+  const computedDuration = Math.max(maxChunkEnd, maxRealInsightEnd, 0);
+  const totalDuration = duration > 0 ? duration : computedDuration;
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -389,15 +411,17 @@ const SuspiciousChunksTimeline: React.FC<{
     ? rationaleWindows.reduce((prev, curr) => (curr.importance || 0) > (prev.importance || 0) ? curr : prev)
     : undefined;
 
-  if (!primary && !technical && (!chunks || chunks.length === 0)) return null;
+  if (!primary && !technical && (!chunks || chunks.length === 0) && !hasRealInsights) return null;
+
+  const displayedRealInsights = showAllRealInsights ? (realInsights || []) : (realInsights || []).slice(0, 3);
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-700/40">
-    <p className="text-[10px] font-black text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+    <p className={`text-[10px] font-black uppercase tracking-wider mb-2 flex items-center gap-1 ${hasRealInsights && !primary && !technical ? 'text-emerald-400' : 'text-red-400'}`}>
     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
-    Analysis Highlights
+    {hasRealInsights && !primary && !technical ? 'Window Insights' : 'Analysis Highlights'}
     </p>
     
     {/* Timeline bar */}
@@ -447,6 +471,22 @@ const SuspiciousChunksTimeline: React.FC<{
       <span className="text-[9px] font-bold text-white drop-shadow">1</span>
       </div>
     )}
+    {!primary && !technical && hasRealInsights && displayedRealInsights.map((insight, idx) => (
+      <div
+      key={`real-window-${insight.chunk_index ?? idx}`}
+      className="absolute top-0 h-full flex items-center justify-center border-r border-black/20"
+      style={{
+        left: `${(insight.start_sec / totalDuration) * 100}%`,
+        width: `${((insight.end_sec - insight.start_sec) / totalDuration) * 100}%`,
+        backgroundColor: '#10b981',
+        opacity: 0.75 - (idx * 0.12),
+        zIndex: 2 - idx,
+      }}
+      title={`Window Insight ${idx + 1}: ${formatTime(insight.start_sec)}–${formatTime(insight.end_sec)}`}
+      >
+      <span className="text-[8px] font-black text-white uppercase px-1">{idx + 1}</span>
+      </div>
+    ))}
     {/* Start / end labels */}
     <span className="absolute left-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">0:00</span>
     <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
@@ -511,6 +551,69 @@ const SuspiciousChunksTimeline: React.FC<{
             </div>
           )}
         </div>
+      </div>
+    )}
+
+    {/* REAL insights cards */}
+    {!primary && !technical && hasRealInsights && (
+      <div className="space-y-3">
+        {displayedRealInsights.map((insight, idx) => (
+          <div
+          key={`real-insight-card-${insight.chunk_index ?? idx}`}
+          className="border rounded-lg p-3 bg-emerald-950/10 border-emerald-600/40"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Window Insight {idx + 1}</span>
+                <span className="text-[11px] font-mono font-bold text-emerald-400">
+                  {formatTime(insight.start_sec)} – {formatTime(insight.end_sec)}
+                </span>
+              </div>
+              {insight.real_confidence !== undefined && (
+                <span className="text-[10px] text-gray-400">
+                  Real Confidence: <span className="font-bold text-emerald-400">{(insight.real_confidence * 100).toFixed(1)}%</span>
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
+              <div className="flex items-center gap-3 text-[10px]">
+                <span className="text-gray-500 uppercase font-black text-[9px]">Importance</span>
+                <span className="text-emerald-300 font-semibold">{insight.importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
+                {insight.importance_score !== undefined && (
+                  <span className="text-gray-400">Score: {(insight.importance_score * 100).toFixed(1)}%</span>
+                )}
+              </div>
+
+              {insight.transcription && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+                  <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
+                    "{insight.transcription}"
+                  </p>
+                </div>
+              )}
+
+              {insight.importance_rationale && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Forensic Rationale</p>
+                  <p className="text-[10px] text-gray-400 leading-tight">
+                    {insight.importance_rationale}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {(realInsights?.length || 0) > 3 && (
+          <button
+          onClick={() => setShowAllRealInsights(prev => !prev)}
+          className="text-[10px] bg-gray-800 hover:bg-gray-700 text-emerald-300 px-2 py-1 rounded border border-gray-700 transition-all"
+          >
+            {showAllRealInsights ? 'Show less' : `Show all ${(realInsights?.length || 0)} windows`}
+          </button>
+        )}
       </div>
     )}
 
@@ -955,12 +1058,13 @@ const ReportDetail: React.FC = () => {
             )}
             {/* Suspicious chunks timeline — handles both performance, performance_metrics, and audio_highlights structures */}
             {((a.performance?.chunking?.enabled || a.performance_metrics?.chunking?.enabled || a.audio_highlights || a.audio_prediction_raw?.highlights) &&
-               (a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || a.audio_highlights || a.audio_prediction_raw?.highlights)) && (
+               (a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || a.audio_highlights || a.audio_prediction_raw?.highlights || a.real_window_insights || a.audio_prediction_raw?.real_window_insights)) && (
                 <SuspiciousChunksTimeline
                 chunks={a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || []}
                 duration={duration}
                 audioWindows={a.audio_windows}
                 highlights={a.audio_highlights || a.audio_prediction_raw?.highlights}
+                realInsights={a.real_window_insights || a.audio_prediction_raw?.real_window_insights}
                 />
               )}
               </>
