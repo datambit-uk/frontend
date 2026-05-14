@@ -24,6 +24,15 @@ interface VideoAnalysis {
   predicted_class_idx?: number;
   score_video?: number;
   num_windows?: number;
+  duration?: number;
+  video_path?: string;
+  performance?: Record<string, any>;
+  individual_models?: Record<string, any>;
+  ensemble_average?: Record<string, any>;
+  predicted_technique?: string;
+  final_video_verdict?: string;
+  final_video_fake_confidence?: number;
+  final_video_real_confidence?: number;
 }
 
 interface SuspiciousChunk {
@@ -158,6 +167,142 @@ interface ReportDetailResponse {
   };
 }
 
+const VideoAnalysisSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data: v, forceExpand }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const showFull = isExpanded || forceExpand;
+
+  if (!v) return null;
+
+  // Simple formatters
+  const formatClassName = (cls: any) => {
+    if (!cls) return 'N/A';
+    return String(cls).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+  };
+
+  const getVerdictColor = (verdict: any) => {
+    if (!verdict) return 'bg-gray-800 text-gray-400';
+    const lower = String(verdict).toLowerCase();
+    if (lower === 'real') return 'bg-green-900/40 text-green-400';
+    return 'bg-red-900/40 text-red-400';
+  };
+
+  const getConfidenceColor = (type: 'real' | 'fake') => {
+    return type === 'real' ? 'text-green-300' : 'text-red-300';
+  };
+
+  return (
+    <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
+      <div className="flex justify-between items-center mb-2">
+        <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Video Analysis</h4>
+        {!forceExpand && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-1 rounded border border-gray-700 transition-all flex items-center gap-1 no-print"
+          >
+            {isExpanded ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Hide
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                Show Full Analysis
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {/* Summary Stats */}
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-black px-2 py-0.5 rounded ${getVerdictColor(v.verdict)}`}>
+            {v.verdict || 'UNKNOWN'}
+          </span>
+        </div>
+
+        <div className="space-y-1 text-[10px] text-gray-400">
+          <p>Predicted Class: <span className="text-gray-300">{formatClassName(v.predicted_class)}</span></p>
+          <p>Fake Confidence: <span className={getConfidenceColor('fake')}>{(Number(v.fake_confidence) * 100).toFixed(2)}%</span></p>
+          <p>Real Confidence: <span className={getConfidenceColor('real')}>{(Number(v.real_confidence) * 100).toFixed(2)}%</span></p>
+          {v.processing_time !== undefined && (
+            <p>Processing Time: <span className="text-gray-300">{Number(v.processing_time).toFixed(2)}s</span></p>
+          )}
+          {v.frames_analyzed !== undefined && (
+            <p>Frames Analyzed: <span className="text-gray-300">{v.frames_analyzed}</span></p>
+          )}
+          {v.faces_detected !== undefined && (
+            <p>Faces Detected: <span className="text-gray-300">{v.faces_detected}</span></p>
+          )}
+        </div>
+      </div>
+
+      {showFull && (
+        <motion.div
+          initial={forceExpand ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={forceExpand ? { duration: 0 } : { duration: 0.3 }}
+          className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
+        >
+          {/* Class Confidences */}
+          {v.class_confidences && (
+            <div>
+              <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Confidence Breakdown</p>
+              <div className="space-y-1 text-[10px]">
+                {Object.entries(v.class_confidences).map(([className, score]: [string, any]) => {
+                  const pct = Number(score) * 100;
+                  return (
+                    <div key={className} className="flex justify-between items-center bg-black/20 p-1.5 rounded">
+                      <span className="text-gray-400">{formatClassName(className)}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 bg-gray-800 h-1 rounded overflow-hidden">
+                          <div 
+                            className={className.toLowerCase() === 'real' ? 'bg-green-500 h-full' : 'bg-red-500 h-full'}
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <span className="text-gray-300 w-12 text-right">{pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Performance Details */}
+          {v.performance && (
+            <div className="bg-black/20 p-2 rounded">
+              <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Performance Metrics</p>
+              <div className="space-y-1 text-[10px]">
+                {v.performance.total_inference_time_ms && (
+                  <p>Total Inference Time: <span className="text-gray-300">{Number(v.performance.total_inference_time_ms).toFixed(2)} ms</span></p>
+                )}
+                {v.performance.total_processing_time_ms && (
+                  <p>Total Processing Time: <span className="text-gray-300">{Number(v.performance.total_processing_time_ms).toFixed(2)} ms</span></p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Avg Inference */}
+          {v.avg_inference_ms && (
+            <div className="bg-black/20 p-2 rounded">
+              <p className="text-[9px] text-gray-500 uppercase font-bold mb-1">Avg Inference Time</p>
+              <p className="text-[10px] text-gray-300">{Number(v.avg_inference_ms).toFixed(2)} ms</p>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
 const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data: initialData, forceExpand }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -259,17 +404,10 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
             {geminiSummary.verdict} ({(geminiSummary.confidence * 100).toFixed(0)}%)
           </span>
         </div>
-        <p className="text-[10px] text-gray-300 leading-tight line-clamp-2 italic print:line-clamp-none">
+        {/* Show more text by default - increased line-clamp */}
+        <p className="text-[10px] text-gray-300 leading-tight line-clamp-4 italic print:line-clamp-none">
           "{geminiSummary.forensic_trail_explanation}"
         </p>
-        {!showFull && (
-          <button 
-            onClick={() => setIsExpanded(true)}
-            className="mt-1.5 text-[9px] text-blue-400 hover:text-blue-300 font-bold uppercase no-print"
-          >
-            Read Full Report →
-          </button>
-        )}
       </div>
     )}
 
@@ -480,7 +618,7 @@ const SuspiciousChunksTimeline: React.FC<{
   highlights?: AudioHighlights;
   realInsights?: RealWindowInsight[];
   forceExpand?: boolean;
-}> = ({ chunks, duration, audioWindows, highlights, realInsights, forceExpand }) => {
+}> = ({ chunks, duration, highlights, realInsights }) => {
   const [showAllRealInsights, setShowAllRealInsights] = useState(false);
   const hasRealInsights = (realInsights?.length ?? 0) > 0;
   const maxChunkEnd = chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0;
@@ -501,317 +639,146 @@ const SuspiciousChunksTimeline: React.FC<{
   const primaryRequiresImmediateReview = Boolean(primary && primaryIsFake && primaryImportanceLabel === "CRITICAL");
 
   // Fallback to top chunk if no highlights
-  const topChunk = chunks.find(c => c.rank === 1) || chunks[0];
-  
-  const rationaleWindows = audioWindows?.filter(w => w.rationale) || [];
-  const topImportanceWindow = rationaleWindows.length > 0 
-    ? rationaleWindows.reduce((prev, curr) => (curr.importance || 0) > (prev.importance || 0) ? curr : prev)
-    : undefined;
-
-  if (!primary && !technical && (!chunks || chunks.length === 0) && !hasRealInsights) return null;
-
-  const displayedRealInsights = (showAllRealInsights || forceExpand) ? (realInsights || []) : (realInsights || []).slice(0, 3);
+  const topChunk = chunks.length > 0 ? chunks[0] : null;
+  const displayedChunk = primary || technical || topChunk;
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-700/40 print-break-inside-avoid">
-    <p className={`text-[10px] font-black uppercase tracking-wider mb-2 flex items-center gap-1 ${hasRealInsights && !primary && !technical ? 'text-emerald-400' : 'text-red-400'}`}>
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    {hasRealInsights && !primary && !technical ? 'Window Insights' : 'Analysis Highlights'}
-    </p>
-    
-    {/* Timeline bar */}
-    <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
-    {primary && primaryRequiresImmediateReview && (
-      <div
-      className="absolute top-0 h-full flex items-center justify-center border-r border-black/20"
-      style={{
-        left: `${(primary.start_sec / totalDuration) * 100}%`,
-        width: `${((primary.end_sec - primary.start_sec) / totalDuration) * 100}%`,
-        backgroundColor: '#dc2626',
-        opacity: 0.8,
-        zIndex: 2,
-      }}
-      title={`Crucial Window: ${formatTime(primary.start_sec)}–${formatTime(primary.end_sec)}`}
-      >
-      <span className="text-[8px] font-black text-white uppercase px-1">Requires Immediate Review</span>
-      </div>
-    )}
-    {technical && (
-      <div
-      className="absolute top-0 h-full flex items-center justify-center opacity-60"
-      style={{
-        left: `${(technical.start_sec / totalDuration) * 100}%`,
-        width: `${((technical.end_sec - technical.start_sec) / totalDuration) * 100}%`,
-        backgroundColor: '#7c3aed',
-        zIndex: 1,
-      }}
-      title={`Forensic Proof: ${formatTime(technical.start_sec)}–${formatTime(technical.end_sec)}`}
-      >
-      {/* If it doesn't overlap perfectly with primary, show a label */}
-      {(!primary || primary.start_sec !== technical.start_sec) && (
-        <span className="text-[8px] font-black text-white uppercase px-1">Proof</span>
+    <div className="mt-4 pt-3 border-t border-gray-700/30">
+      {/* Display Primary Alert or Top Chunk Summary */}
+      {displayedChunk && (
+        <div className="mb-4 p-2 bg-red-900/10 border border-red-700/20 rounded">
+          <p className="text-[9px] font-black text-red-400 uppercase mb-1.5">
+            {primary ? '⚠️ Primary Alert' : technical ? '🔍 Technical Proof' : '⚠️ Top Suspicious Chunk'}
+          </p>
+          <p className="text-[10px] text-gray-300">
+            <span className="font-mono">
+              {formatTime((displayedChunk as any).start_sec || (displayedChunk as any).chunk_index * 5)} 
+              {' → '}
+              {formatTime((displayedChunk as any).end_sec || ((displayedChunk as any).chunk_index + 1) * 5)}
+            </span>
+          </p>
+          {(displayedChunk as any).fake_confidence !== undefined && (
+            <p className="text-[10px] text-red-300 mt-1">
+              Confidence: {(((displayedChunk as any).fake_confidence || 0) * 100).toFixed(1)}%
+            </p>
+          )}
+          {(displayedChunk as any).transcription && (
+            <p className="text-[10px] text-gray-400 mt-1 italic">"{(displayedChunk as any).transcription}"</p>
+          )}
+          {(displayedChunk as any).importance_rationale && (
+            <p className="text-[10px] text-gray-400 mt-1">{(displayedChunk as any).importance_rationale}</p>
+          )}
+        </div>
       )}
-      </div>
-    )}
-    {!primary && !technical && topChunk && (
-      <div
-      className="absolute top-0 h-full flex items-center justify-center"
-      style={{
-        left: `${(topChunk.start_sec / totalDuration) * 100}%`,
-        width: `${((topChunk.end_sec - topChunk.start_sec) / totalDuration) * 100}%`,
-        backgroundColor: '#dc2626',
-        opacity: 0.8,
-      }}
-      >
-      <span className="text-[9px] font-bold text-white drop-shadow">1</span>
-      </div>
-    )}
-    {!primary && !technical && hasRealInsights && displayedRealInsights.map((insight, idx) => (
-      <div
-      key={`real-window-${insight.chunk_index ?? idx}`}
-      className="absolute top-0 h-full flex items-center justify-center border-r border-black/20"
-      style={{
-        left: `${(insight.start_sec / totalDuration) * 100}%`,
-        width: `${((insight.end_sec - insight.start_sec) / totalDuration) * 100}%`,
-        backgroundColor: '#10b981',
-        opacity: 0.75 - (idx * 0.12),
-        zIndex: 2 - idx,
-      }}
-      title={`Window Insight ${idx + 1}: ${formatTime(insight.start_sec)}–${formatTime(insight.end_sec)}`}
-      >
-      <span className="text-[8px] font-black text-white uppercase px-1">{idx + 1}</span>
-      </div>
-    ))}
-    {/* Start / end labels */}
-    <span className="absolute left-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">0:00</span>
-    <span className="absolute right-1 bottom-0.5 text-[8px] text-gray-400 font-mono leading-none">{formatTime(totalDuration)}</span>
-    </div>
 
-    {/* Details Cards */}
-    <div className="space-y-3">
-    {/* 1. Primary Alert */}
-    {primary && (
-      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40 print-break-inside-avoid">
-        <div className="flex items-center flex-wrap gap-2 mb-2">
-          <span className="px-3 py-1 bg-red-600 text-white text-[9px] font-black rounded-full uppercase tracking-tighter">
-            Most Crucial Window
-          </span>
-          <span className="text-[11px] font-mono font-bold text-red-400">
-            {formatTime(primary.start_sec)} – {formatTime(primary.end_sec)}
-            {primary.fake_confidence !== undefined && (
-              <span className="ml-2 text-[10px] text-gray-400 font-normal">
-                Confidence: <span className="font-bold text-red-400">{(primary.fake_confidence * 100).toFixed(1)}%</span>
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
-          <div className="flex items-center gap-3 text-[10px]">
-            <span className="text-gray-500 uppercase font-black text-[9px]">Importance</span>
-            <span className="text-red-300 font-semibold">{(primary as any)?.importance_label || "UNKNOWN/NEGLIGIBLE"}</span>
-            {(primary as any)?.importance_score !== undefined && (
-              <span className="text-gray-400">Score: {(Number((primary as any).importance_score) * 100).toFixed(1)}%</span>
+      {/* Real Insights */}
+      {hasRealInsights && (
+        <div className="mb-4 p-2 bg-green-900/10 border border-green-700/20 rounded">
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-[9px] font-black text-green-400 uppercase">✓ Real Windows</p>
+            {(realInsights?.length ?? 0) > 1 && (
+              <button 
+                onClick={() => setShowAllRealInsights(!showAllRealInsights)}
+                className="ml-auto text-[9px] text-blue-400 hover:text-blue-300 no-print"
+              >
+                {showAllRealInsights ? 'Collapse' : `Show ${(realInsights?.length ?? 0) - 1} more`}
+              </button>
             )}
           </div>
-          {(primary as any)?.transcription && (
-            <div>
-              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-              <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
-                "{(primary as any).transcription}"
-              </p>
-            </div>
-          )}
-          {primary.importance_rationale && (
-            <div>
-              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Forensic Rationale</p>
-              <p className="text-[10px] text-gray-400 leading-tight">
-                {primary.importance_rationale}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* 2. Technical Proof */}
-    {technical && (
-      <div className="border rounded-lg p-3 bg-purple-950/10 border-purple-600/40 print-break-inside-avoid">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Forensic Proof</span>
-            <span className="text-[11px] font-mono font-bold text-purple-400">
-              {formatTime(technical.start_sec)} – {formatTime(technical.end_sec)}
-            </span>
-          </div>
-          {technical.fake_confidence !== undefined && (
-            <span className="text-[10px] text-gray-400">
-              Confidence: <span className="font-bold text-purple-400">{(technical.fake_confidence * 100).toFixed(1)}%</span>
-            </span>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* REAL insights cards */}
-    {!primary && !technical && hasRealInsights && (
-      <div className="space-y-3">
-        {displayedRealInsights.map((insight, idx) => (
-          <div
-          key={`real-insight-card-${insight.chunk_index ?? idx}`}
-          className="border rounded-lg p-3 bg-emerald-950/10 border-emerald-600/40 print-break-inside-avoid"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-emerald-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Window Insight {idx + 1}</span>
-                <span className="text-[11px] font-mono font-bold text-emerald-400">
-                  {formatTime(insight.start_sec)} – {formatTime(insight.end_sec)}
-                </span>
-              </div>
-              {insight.real_confidence !== undefined && (
-                <span className="text-[10px] text-gray-400">
-                  Real Confidence: <span className="font-bold text-emerald-400">{(insight.real_confidence * 100).toFixed(1)}%</span>
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
-              <div className="flex items-center gap-3 text-[10px]">
-                <span className="text-gray-500 uppercase font-black text-[9px]">Importance</span>
-                <span className="text-emerald-300 font-semibold">{insight.importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
-                {insight.importance_score !== undefined && (
-                  <span className="text-gray-400">Score: {(insight.importance_score * 100).toFixed(1)}%</span>
-                )}
-              </div>
-
-              {insight.transcription && (
-                <div>
-                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-                  <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
-                    "{insight.transcription}"
+          
+          {realInsights && (
+            <div className="space-y-1">
+              {realInsights.slice(0, showAllRealInsights ? undefined : 1).map((insight, i) => (
+                <div key={i} className="text-[10px] text-gray-300 bg-black/20 p-1.5 rounded">
+                  <p className="font-mono">
+                    {formatTime(insight.start_sec)} → {formatTime(insight.end_sec)}
+                    {insight.importance_label && <span className="ml-2 text-green-300">({insight.importance_label})</span>}
                   </p>
+                  {insight.transcription && <p className="text-gray-400 italic mt-0.5">"{insight.transcription}"</p>}
+                  {insight.importance_rationale && <p className="text-gray-400 text-[9px] mt-0.5">{insight.importance_rationale}</p>}
                 </div>
-              )}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-              {insight.importance_rationale && (
-                <div>
-                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Forensic Rationale</p>
-                  <p className="text-[10px] text-gray-400 leading-tight">
-                    {insight.importance_rationale}
-                  </p>
-                </div>
-              )}
+      {/* Timeline Visualization */}
+      {chunks.length > 0 && (
+        <div className="p-2 bg-black/30 rounded">
+          <p className="text-[9px] text-gray-500 uppercase font-bold mb-1.5">Timeline ({chunks.length} suspicious)</p>
+          <div className="relative h-8 bg-black/50 rounded-full border border-gray-700/50 overflow-hidden mb-2">
+            <div className="absolute inset-0 flex items-center">
+              {chunks.map((chunk, i) => (
+                <div
+                  key={i}
+                  className="bg-red-500 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                  style={{
+                    left: `${(chunk.start_sec / totalDuration) * 100}%`,
+                    width: `${((chunk.end_sec - chunk.start_sec) / totalDuration) * 100}%`,
+                    height: '100%',
+                    minWidth: '2px',
+                  }}
+                  title={`Chunk ${chunk.rank}: ${formatTime(chunk.start_sec)}-${formatTime(chunk.end_sec)}`}
+                />
+              ))}
             </div>
           </div>
-        ))}
-
-        {(realInsights?.length || 0) > 3 && !forceExpand && (
-          <button
-          onClick={() => setShowAllRealInsights(prev => !prev)}
-          className="text-[10px] bg-gray-800 hover:bg-gray-700 text-emerald-300 px-2 py-1 rounded border border-gray-700 transition-all no-print"
-          >
-            {showAllRealInsights ? 'Show less' : `Show all ${(realInsights?.length || 0)} windows`}
-          </button>
-        )}
-      </div>
-    )}
-
-    {/* Fallback to Top Suspicious Chunk if no highlights */}
-    {!primary && !technical && topChunk && (
-      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40 print-break-inside-avoid">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white bg-red-600">1</span>
-            <span className="text-[11px] font-mono font-bold text-red-400">
-              {formatTime(topChunk.start_sec)} – {formatTime(topChunk.end_sec)}
-            </span>
-          </div>
-          <span className="text-[10px] text-gray-400">
-            Top Suspicious: <span className="font-bold text-red-400">{(topChunk.fake_confidence * 100).toFixed(1)}%</span>
-          </span>
+          <p className="text-[9px] text-gray-400">0:00 ─ {formatTime(totalDuration)}</p>
         </div>
-        {audioWindows?.find(w => w.chunk_index === topChunk.chunk_index) && (() => {
-          const w = audioWindows.find(win => win.chunk_index === topChunk.chunk_index);
-          return (
-            <div className="mt-2 pt-2 border-t border-gray-700/30">
-              {w?.transcription && (
-                <div className="mb-2">
-                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-                  <p className="text-[11px] text-gray-300 italic bg-black/20 p-2 rounded border border-gray-800/30">"{w.transcription}"</p>
-                </div>
-              )}
-              {w?.rationale && (
-                <div>
-                  <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Rationale</p>
-                  <p className="text-[10px] text-gray-400">{w.rationale}</p>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-    )}
-
-    {/* Importance Rationale (Key Forensic Rationale) - Keep this as additional context if available */}
-    {topImportanceWindow && (!primary || topImportanceWindow.start_sec !== primary.start_sec) && (!technical || topImportanceWindow.start_sec !== technical.start_sec) && (!topChunk || topImportanceWindow.chunk_index !== topChunk.chunk_index) && (
-        <div className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10 print-break-inside-avoid">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider">Additional Forensic Insight</span>
-            <span className="text-[10px] text-orange-400 font-bold">Importance: {topImportanceWindow.importance?.toFixed(2)}</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-orange-700/20">
-            <p className="text-[10px] text-gray-400 leading-tight">{topImportanceWindow.rationale}</p>
-          </div>
-        </div>
-    )}
-    </div>
+      )}
     </div>
   );
 };
 
-const HeatmapSection: React.FC<{ urls: string[] | null | undefined }> = ({ urls }) => {
+const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
   if (!urls || urls.length === 0) return null;
 
   return (
-    <div className="mt-4 pt-3 border-t border-gray-700/50">
-    <div className="flex items-center gap-2 mb-3">
-    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Heatmap</h4>
-    <span className="text-[10px] bg-orange-900/30 text-orange-300 px-1.5 py-0.5 rounded border border-orange-700/30">Deleted after 30 days</span>
-    </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div>
+    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-3">Video Heatmaps</h4>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
     {urls.map((url, i) => {
-      const isVideo = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().endsWith('.webm') || url.includes('video');
+      // If it's base64, render directly; if it's a URL, link to it
+      const isBase64 = url.startsWith('data:');
+      const isUrl = url.startsWith('http');
+
       return (
-        <div key={i} className="relative group bg-black/40 rounded-xl overflow-hidden border border-gray-700/50 hover:border-blue-500/50 transition-all shadow-2xl">
-        {isVideo ? (
-          <video
+        <div key={i} className="relative group aspect-video bg-black/50 rounded-lg overflow-hidden border border-gray-700/50 hover:border-orange-400/50 transition-all">
+        {isBase64 && (
+          <img
           src={url}
-          controls
-          className="w-full aspect-video object-cover"
-          muted
-          loop
+          alt={`Heatmap ${i + 1}`}
+          className="w-full h-full object-cover"
           />
-        ) : (
-          <img src={url} alt={`Forensic analysis ${i+1}`} className="w-full aspect-video object-cover" />
         )}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="p-1.5 bg-gray-900/90 rounded-lg text-blue-400 hover:text-blue-300 border border-gray-700 shadow-xl"
-        title="Open original"
-        >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-        </svg>
-        </a>
-        </div>
+        {isUrl && (
+          <img
+          src={url}
+          alt={`Heatmap ${i + 1}`}
+          className="w-full h-full object-cover"
+          />
+        )}
+        {!isBase64 && !isUrl && (
+          <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs text-center p-2">
+          <span>{url.substring(0, 20)}...</span>
+          </div>
+        )}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-        <span className="text-[9px] text-gray-300 font-medium truncate block">Source: forensic_node_{i+1}</span>
+        <span className="text-[9px] text-gray-300 font-medium truncate block">forensic_node_{i+1}</span>
         </div>
+        {isUrl && (
+          <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-orange-600 rounded transition-all"
+          >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          </a>
+        )}
         </div>
       );
     })}
@@ -972,11 +939,6 @@ const ReportDetail: React.FC = () => {
       return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
     };
 
-    const formatClassName = (cls: string | undefined | null) => {
-      if (!cls) return 'N/A';
-      return cls.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    };
-
     if (upload.file_status === 'error') {
       return (
         <div>
@@ -1048,45 +1010,9 @@ const ReportDetail: React.FC = () => {
       let audioBlock: React.ReactElement | null = null;
 
       if (hasVideoAnalysis) {
-        const v = upload.result!.video_analysis!;
-        const syntheticScore = (v.class_confidences && typeof v.class_confidences === 'object')
-        ? Object.entries(v.class_confidences)
-        .filter(([cls]) => cls.toLowerCase() !== 'real')
-        .reduce((sum, [_, score]) => sum + (score as number), 0)
-        : v.fake_confidence;
-
         videoBlock = (
-          <div key="video-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
-          <h4 className="text-sm font-semibold text-blue-300 mb-1">Video Analysis:</h4>
-          <p className="text-xs text-gray-400">
-          Verdict:{' '}
-          <span className={getLabelColor(v.verdict)}>{capitalizeFirst(v.verdict)}</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Predicted Class: <span className="text-gray-300">{formatClassName(v.predicted_class)}</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Fake Confidence: <span className="text-red-300">{(syntheticScore * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Real Confidence: <span className="text-green-300">{(v.real_confidence * 100).toFixed(2)}%</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Processing Time: <span className="text-gray-300">{v.processing_time?.toFixed(2) ?? 'N/A'}s</span>
-          </p>
-          <p className="text-xs text-gray-400">
-          Avg Inference: <span className="text-gray-300">{v.avg_inference_ms?.toFixed(2) ?? 'N/A'} ms</span>
-          </p>
-          {v.frames_analyzed !== undefined && (
-            <p className="text-xs text-gray-400">
-            Frames Analyzed: <span className="text-gray-300">{v.frames_analyzed}</span>
-            </p>
-          )}
-          {v.num_windows !== undefined && (
-            <p className="text-xs text-gray-400">
-            Windows: <span className="text-gray-300">{v.num_windows}</span>
-            </p>
-          )}
+          <div key="video-analysis" className="h-full">
+            <VideoAnalysisSection data={upload.result!.video_analysis} forceExpand={forceExpand} />
           </div>
         );
       }
@@ -1255,32 +1181,14 @@ const ReportDetail: React.FC = () => {
       @media print {
         body {
           background-color: #030712 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color: white !important;
         }
         .no-print {
           display: none !important;
         }
-        @page {
-          margin: 10mm;
-          size: auto;
-        }
         .print-break-inside-avoid {
-          break-inside: avoid;
+          break-inside: avoid !important;
         }
-        /* Hide sidebar and header during print */
-        header, nav, aside, [role="navigation"], .sidebar {
-          display: none !important;
-        }
-        /* Expand main content to full width */
-        main {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100% !important;
-          max-width: 100% !important;
-        }
-        .max-w-screen-xl {
+        * {
           max-width: 100% !important;
           width: 100% !important;
           margin: 0 !important;
