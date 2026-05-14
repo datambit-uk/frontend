@@ -496,6 +496,9 @@ const SuspiciousChunksTimeline: React.FC<{
 
   const primary = highlights?.primary_alert;
   const technical = highlights?.technical_proof;
+  const primaryImportanceLabel = String((primary as any)?.importance_label || "").toUpperCase();
+  const primaryIsFake = String((primary as any)?.verdict || "").toUpperCase() === "FAKE";
+  const primaryRequiresImmediateReview = Boolean(primary && primaryIsFake && primaryImportanceLabel === "CRITICAL");
 
   // Fallback to top chunk if no highlights
   const topChunk = chunks.find(c => c.rank === 1) || chunks[0];
@@ -520,7 +523,7 @@ const SuspiciousChunksTimeline: React.FC<{
     
     {/* Timeline bar */}
     <div className="relative h-7 bg-gray-700/40 rounded-full overflow-hidden mb-3">
-    {primary && (
+    {primary && primaryRequiresImmediateReview && (
       <div
       className="absolute top-0 h-full flex items-center justify-center border-r border-black/20"
       style={{
@@ -591,21 +594,36 @@ const SuspiciousChunksTimeline: React.FC<{
     {/* 1. Primary Alert */}
     {primary && (
       <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40 print-break-inside-avoid">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Primary Alert</span>
-            <span className="text-[11px] font-mono font-bold text-red-400">
-              {formatTime(primary.start_sec)} – {formatTime(primary.end_sec)}
-            </span>
-          </div>
-          {primary.fake_confidence !== undefined && (
-            <span className="text-[10px] text-gray-400">
-              Confidence: <span className="font-bold text-red-400">{(primary.fake_confidence * 100).toFixed(1)}%</span>
-            </span>
-          )}
+        <div className="flex items-center flex-wrap gap-2 mb-2">
+          <span className="px-3 py-1 bg-red-600 text-white text-[9px] font-black rounded-full uppercase tracking-tighter">
+            Most Crucial Window
+          </span>
+          <span className="text-[11px] font-mono font-bold text-red-400">
+            {formatTime(primary.start_sec)} – {formatTime(primary.end_sec)}
+            {primary.fake_confidence !== undefined && (
+              <span className="ml-2 text-[10px] text-gray-400 font-normal">
+                Confidence: <span className="font-bold text-red-400">{(primary.fake_confidence * 100).toFixed(1)}%</span>
+              </span>
+            )}
+          </span>
         </div>
 
         <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
+          <div className="flex items-center gap-3 text-[10px]">
+            <span className="text-gray-500 uppercase font-black text-[9px]">Importance</span>
+            <span className="text-red-300 font-semibold">{(primary as any)?.importance_label || "UNKNOWN/NEGLIGIBLE"}</span>
+            {(primary as any)?.importance_score !== undefined && (
+              <span className="text-gray-400">Score: {(Number((primary as any).importance_score) * 100).toFixed(1)}%</span>
+            )}
+          </div>
+          {(primary as any)?.transcription && (
+            <div>
+              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
+              <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
+                "{(primary as any).transcription}"
+              </p>
+            </div>
+          )}
           {primary.importance_rationale && (
             <div>
               <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Forensic Rationale</p>
@@ -623,7 +641,7 @@ const SuspiciousChunksTimeline: React.FC<{
       <div className="border rounded-lg p-3 bg-purple-950/10 border-purple-600/40 print-break-inside-avoid">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Technical Proof</span>
+            <span className="px-2 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Forensic Proof</span>
             <span className="text-[11px] font-mono font-bold text-purple-400">
               {formatTime(technical.start_sec)} – {formatTime(technical.end_sec)}
             </span>
@@ -632,17 +650,6 @@ const SuspiciousChunksTimeline: React.FC<{
             <span className="text-[10px] text-gray-400">
               Confidence: <span className="font-bold text-purple-400">{(technical.fake_confidence * 100).toFixed(1)}%</span>
             </span>
-          )}
-        </div>
-
-        <div className="space-y-2 mt-2 pt-2 border-t border-gray-700/30">
-          {technical.transcription && (
-            <div>
-              <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Transcript</p>
-              <p className="text-[11px] text-gray-300 italic leading-relaxed bg-black/20 p-2 rounded border border-gray-800/30">
-                "{technical.transcription}"
-              </p>
-            </div>
           )}
         </div>
       </div>
