@@ -158,7 +158,7 @@ interface ReportDetailResponse {
   };
 }
 
-const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
+const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data: initialData, forceExpand }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   // Resilient data parsing
@@ -186,6 +186,7 @@ const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
   const score = data.suspicious_score !== undefined ? data.suspicious_score : (data.score !== undefined ? data.score : 'N/A');
   const anomalies = data.top_anomalies || data.anomalies || [];
   const inconsistencies = data.top_inconsistencies || data.metadata_inconsistencies || [];
+  const geminiSummary = data.gemini_summary;
 
   // Helper mappings for the new forensic_analysis structure
   const forensic = data.forensic_analysis || {};
@@ -197,35 +198,39 @@ const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
   const likelySource = data.forensic_summary?.likely_source || data.source_analysis?.likely_source || hwSw.likely_source || null;
   const hwSwConfidence = data.confidence || data.forensic_summary?.hw_sw_confidence || data.source_analysis?.confidence || hwSw.confidence || 0;
 
+  const showFull = isExpanded || forceExpand;
+
   return (
-    <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm">
+    <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
     <div className="flex justify-between items-center mb-2">
     <h4 className="text-xs font-bold text-green-400 uppercase tracking-wider">Metadata Analysis</h4>
-    <button
-    onClick={() => setIsExpanded(!isExpanded)}
-    className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-1 rounded border border-gray-700 transition-all flex items-center gap-1"
-    >
-    {isExpanded ? (
-      <>
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-      </svg>
-      Hide
-      </>
-    ) : (
-      <>
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-      Show Full Analysis
-      </>
+    {!forceExpand && (
+      <button
+      onClick={() => setIsExpanded(!isExpanded)}
+      className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-1 rounded border border-gray-700 transition-all flex items-center gap-1 no-print"
+      >
+      {isExpanded ? (
+        <>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+        Hide
+        </>
+      ) : (
+        <>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+        Show Full Analysis
+        </>
+      )}
+      </button>
     )}
-    </button>
     </div>
 
     <div className="space-y-2">
     <div className="flex items-center gap-2">
-    <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict === 'SUSPICIOUS' ? 'bg-yellow-900/40 text-yellow-400' : (verdict === 'CLEAN' ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400')}`}>
+    <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict === 'SUSPICIOUS' || verdict === 'MANIPULATED' ? 'bg-yellow-900/40 text-yellow-400' : (verdict === 'CLEAN' ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400')}`}>
     {verdict}
     </span>
     <span className="text-[10px] text-gray-400 font-mono">Score: {typeof score === 'number' ? score.toFixed(4) : score}</span>
@@ -241,6 +246,33 @@ const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
       </div>
     )}
 
+    {geminiSummary && (
+      <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="p-0.5 bg-blue-500/20 rounded">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <span className="text-[9px] font-black text-blue-300 uppercase tracking-wider">AI Forensic Insights</span>
+          <span className={`ml-auto text-[8px] font-bold px-1 rounded ${geminiSummary.verdict === 'MANIPULATED' ? 'text-red-400 bg-red-950/40' : 'text-green-400 bg-green-950/40'}`}>
+            {geminiSummary.verdict} ({(geminiSummary.confidence * 100).toFixed(0)}%)
+          </span>
+        </div>
+        <p className="text-[10px] text-gray-300 leading-tight line-clamp-2 italic print:line-clamp-none">
+          "{geminiSummary.forensic_trail_explanation}"
+        </p>
+        {!showFull && (
+          <button 
+            onClick={() => setIsExpanded(true)}
+            className="mt-1.5 text-[9px] text-blue-400 hover:text-blue-300 font-bold uppercase no-print"
+          >
+            Read Full Report →
+          </button>
+        )}
+      </div>
+    )}
+
     {anomalies.length > 0 && (
       <div className="text-[10px] bg-yellow-900/10 border border-yellow-700/20 rounded p-1.5">
       <div className="flex items-center gap-1 text-yellow-500 font-bold mb-1 uppercase text-[9px]">
@@ -250,21 +282,82 @@ const MetadataSection: React.FC<{ data: any }> = ({ data: initialData }) => {
       Detected Anomalies ({anomalies.length})
       </div>
       <ul className="list-disc list-inside text-gray-400 space-y-0.5">
-      {anomalies.slice(0, isExpanded ? undefined : 2).map((a: string, i: number) => (
+      {anomalies.slice(0, showFull ? undefined : 2).map((a: string, i: number) => (
         <li key={i} className="leading-tight">{a}</li>
       ))}
-      {!isExpanded && anomalies.length > 2 && <li className="list-none text-blue-400 mt-0.5 font-medium">+ {anomalies.length - 2} more...</li>}
+      {!showFull && anomalies.length > 2 && <li className="list-none text-blue-400 mt-0.5 font-medium no-print">+ {anomalies.length - 2} more...</li>}
       </ul>
       </div>
     )}
     </div>
 
-    {isExpanded && (
+    {showFull && (
       <motion.div
-      initial={{ opacity: 0, y: -10 }}
+      initial={forceExpand ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={forceExpand ? { duration: 0 } : { duration: 0.3 }}
       className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
       >
+      {geminiSummary && (
+        <div className="bg-blue-900/10 p-3 rounded-lg border border-blue-500/20">
+          <p className="text-[10px] font-black text-blue-300 uppercase mb-2 border-b border-blue-500/30 pb-1">Detailed Forensic Report</p>
+          
+          {geminiSummary.key_findings && geminiSummary.key_findings.length > 0 && (
+            <div className="mb-3">
+              <p className="text-[9px] font-black text-gray-500 uppercase mb-1.5">Key Findings</p>
+              <ul className="space-y-1.5">
+                {geminiSummary.key_findings.map((finding: string, i: number) => (
+                  <li key={i} className="text-[10px] text-gray-300 flex gap-2 leading-snug">
+                    <span className="text-blue-500 font-bold">•</span>
+                    {finding}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {geminiSummary.fps_summary && geminiSummary.fps_summary !== 'N/A' && (
+              <div className="bg-black/30 p-1.5 rounded">
+                <p className="text-[8px] text-gray-500 uppercase font-bold">FPS Summary</p>
+                <p className="text-[10px] text-blue-200">{geminiSummary.fps_summary}</p>
+              </div>
+            )}
+            {geminiSummary.bitrate_summary && geminiSummary.bitrate_summary !== 'N/A' && (
+              <div className="bg-black/30 p-1.5 rounded">
+                <p className="text-[8px] text-gray-500 uppercase font-bold">Bitrate</p>
+                <p className="text-[10px] text-blue-200">{geminiSummary.bitrate_summary}</p>
+              </div>
+            )}
+            {geminiSummary.matrix_summary && geminiSummary.matrix_summary !== 'N/A' && (
+              <div className="bg-black/30 p-1.5 rounded">
+                <p className="text-[8px] text-gray-500 uppercase font-bold">Matrix</p>
+                <p className="text-[10px] text-blue-200">{geminiSummary.matrix_summary}</p>
+              </div>
+            )}
+             {geminiSummary.atoms_summary && geminiSummary.atoms_summary !== 'N/A' && (
+              <div className="bg-black/30 p-1.5 rounded">
+                <p className="text-[8px] text-gray-500 uppercase font-bold">Atoms</p>
+                <p className="text-[10px] text-blue-200">{geminiSummary.atoms_summary}</p>
+              </div>
+            )}
+            {geminiSummary.neural_metadata_alignment && geminiSummary.neural_metadata_alignment !== 'N/A' && (
+              <div className="bg-black/30 p-1.5 rounded">
+                <p className="text-[8px] text-gray-500 uppercase font-bold">Alignment</p>
+                <p className="text-[10px] text-blue-200">{geminiSummary.neural_metadata_alignment}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Full Explanation</p>
+            <p className="text-[10px] text-gray-400 leading-relaxed bg-black/40 p-2 rounded border border-gray-800/50 italic">
+              {geminiSummary.forensic_trail_explanation}
+            </p>
+          </div>
+        </div>
+      )}
+
       {(data.file_info || data.file_hash || data.file_size) && (
         <div className="bg-black/20 p-2 rounded">
         <p className="text-[9px] font-black text-gray-500 uppercase mb-1.5 border-b border-gray-800 pb-1">File Information</p>
@@ -386,7 +479,8 @@ const SuspiciousChunksTimeline: React.FC<{
   audioWindows?: AudioWindow[];
   highlights?: AudioHighlights;
   realInsights?: RealWindowInsight[];
-}> = ({ chunks, duration, audioWindows, highlights, realInsights }) => {
+  forceExpand?: boolean;
+}> = ({ chunks, duration, audioWindows, highlights, realInsights, forceExpand }) => {
   const [showAllRealInsights, setShowAllRealInsights] = useState(false);
   const hasRealInsights = (realInsights?.length ?? 0) > 0;
   const maxChunkEnd = chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0;
@@ -413,10 +507,10 @@ const SuspiciousChunksTimeline: React.FC<{
 
   if (!primary && !technical && (!chunks || chunks.length === 0) && !hasRealInsights) return null;
 
-  const displayedRealInsights = showAllRealInsights ? (realInsights || []) : (realInsights || []).slice(0, 3);
+  const displayedRealInsights = (showAllRealInsights || forceExpand) ? (realInsights || []) : (realInsights || []).slice(0, 3);
 
   return (
-    <div className="mt-3 pt-3 border-t border-gray-700/40">
+    <div className="mt-3 pt-3 border-t border-gray-700/40 print-break-inside-avoid">
     <p className={`text-[10px] font-black uppercase tracking-wider mb-2 flex items-center gap-1 ${hasRealInsights && !primary && !technical ? 'text-emerald-400' : 'text-red-400'}`}>
     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -496,7 +590,7 @@ const SuspiciousChunksTimeline: React.FC<{
     <div className="space-y-3">
     {/* 1. Primary Alert */}
     {primary && (
-      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40">
+      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40 print-break-inside-avoid">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Primary Alert</span>
@@ -526,7 +620,7 @@ const SuspiciousChunksTimeline: React.FC<{
 
     {/* 2. Technical Proof */}
     {technical && (
-      <div className="border rounded-lg p-3 bg-purple-950/10 border-purple-600/40">
+      <div className="border rounded-lg p-3 bg-purple-950/10 border-purple-600/40 print-break-inside-avoid">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-purple-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Technical Proof</span>
@@ -560,7 +654,7 @@ const SuspiciousChunksTimeline: React.FC<{
         {displayedRealInsights.map((insight, idx) => (
           <div
           key={`real-insight-card-${insight.chunk_index ?? idx}`}
-          className="border rounded-lg p-3 bg-emerald-950/10 border-emerald-600/40"
+          className="border rounded-lg p-3 bg-emerald-950/10 border-emerald-600/40 print-break-inside-avoid"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -606,10 +700,10 @@ const SuspiciousChunksTimeline: React.FC<{
           </div>
         ))}
 
-        {(realInsights?.length || 0) > 3 && (
+        {(realInsights?.length || 0) > 3 && !forceExpand && (
           <button
           onClick={() => setShowAllRealInsights(prev => !prev)}
-          className="text-[10px] bg-gray-800 hover:bg-gray-700 text-emerald-300 px-2 py-1 rounded border border-gray-700 transition-all"
+          className="text-[10px] bg-gray-800 hover:bg-gray-700 text-emerald-300 px-2 py-1 rounded border border-gray-700 transition-all no-print"
           >
             {showAllRealInsights ? 'Show less' : `Show all ${(realInsights?.length || 0)} windows`}
           </button>
@@ -619,7 +713,7 @@ const SuspiciousChunksTimeline: React.FC<{
 
     {/* Fallback to Top Suspicious Chunk if no highlights */}
     {!primary && !technical && topChunk && (
-      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40">
+      <div className="border rounded-lg p-3 bg-red-950/10 border-red-600/40 print-break-inside-avoid">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center text-white bg-red-600">1</span>
@@ -655,7 +749,7 @@ const SuspiciousChunksTimeline: React.FC<{
 
     {/* Importance Rationale (Key Forensic Rationale) - Keep this as additional context if available */}
     {topImportanceWindow && (!primary || topImportanceWindow.start_sec !== primary.start_sec) && (!technical || topImportanceWindow.start_sec !== technical.start_sec) && (!topChunk || topImportanceWindow.chunk_index !== topChunk.chunk_index) && (
-        <div className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10">
+        <div className="border border-orange-700/40 rounded-lg p-3 bg-orange-950/10 print-break-inside-avoid">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-black text-orange-400 uppercase tracking-wider">Additional Forensic Insight</span>
             <span className="text-[10px] text-orange-400 font-bold">Importance: {topImportanceWindow.importance?.toFixed(2)}</span>
@@ -726,12 +820,22 @@ const ReportDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [hasProcessingItems, setHasProcessingItems] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const pollingInterval = useRef<number | null>(null);
   const POLL_INTERVAL = 10000; // 10 seconds
   const navigate = useNavigate();
 
   const handleBackToReport = () => {
     navigate(-1);
+  };
+
+  const handleExportPDF = () => {
+    setIsPrinting(true);
+    // Give time for state to update and layout to expand
+    setTimeout(() => {
+      window.print();
+      setIsPrinting(false);
+    }, 500);
   };
 
   // Check if any items are in processing state
@@ -846,7 +950,7 @@ const ReportDetail: React.FC = () => {
     return parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const formatResult = (upload: FileUpload) => {
+  const formatResult = (upload: FileUpload, forceExpand: boolean = false) => {
     // Helper function to get label color
     const getLabelColor = (label: string | undefined | null) => {
       if (!label) return 'text-gray-400';
@@ -1065,6 +1169,7 @@ const ReportDetail: React.FC = () => {
                 audioWindows={a.audio_windows}
                 highlights={a.audio_highlights || a.audio_prediction_raw?.highlights}
                 realInsights={a.real_window_insights || a.audio_prediction_raw?.real_window_insights}
+                forceExpand={forceExpand}
                 />
               )}
               </>
@@ -1084,7 +1189,7 @@ const ReportDetail: React.FC = () => {
         {audioBlock}
         {hasMetadata && (
           <div className="h-full">
-          <MetadataSection data={upload.result!.metadata_analysis} />
+          <MetadataSection data={upload.result!.metadata_analysis} forceExpand={forceExpand} />
           </div>
         )}
         </div>
@@ -1139,6 +1244,43 @@ const ReportDetail: React.FC = () => {
     animate={{ opacity: 1 }}
     className="w-full h-full"
     >
+    <style dangerouslySetInnerHTML={{ __html: `
+      @media print {
+        body {
+          background-color: #030712 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color: white !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        @page {
+          margin: 10mm;
+          size: auto;
+        }
+        .print-break-inside-avoid {
+          break-inside: avoid;
+        }
+        /* Hide sidebar and header during print */
+        header, nav, aside, [role="navigation"], .sidebar {
+          display: none !important;
+        }
+        /* Expand main content to full width */
+        main {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        .max-w-screen-xl {
+          max-width: 100% !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      }
+    ` }} />
 
     <div className="w-full h-full">
     <div className="flex flex-col gap-2 h-full py-1">
@@ -1164,8 +1306,18 @@ const ReportDetail: React.FC = () => {
       <span className="text-lg font-bold text-red-400">{totalFake}</span>
       </div>
       </div>
-      {/* Back Button right */}
-      <div className="flex flex-col items-end min-w-[60px] flex-1 justify-center">
+      {/* Actions right */}
+      <div className="flex flex-row items-center gap-2 min-w-[160px] flex-1 justify-end no-print">
+      <button
+      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all duration-200 shadow-lg shadow-blue-900/20"
+      onClick={handleExportPDF}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Export PDF
+      </button>
+
       <button
       className="text-blue-400 hover:text-blue-300 transition-all duration-200 text-sm p-2 rounded-full"
       onClick={handleBackToReport}
@@ -1261,7 +1413,7 @@ const ReportDetail: React.FC = () => {
 
           {/* Result Content */}
           <div className="p-6">
-          {formatResult(upload)}
+          {formatResult(upload, isPrinting)}
           </div>
           </motion.div>
         ))}
@@ -1311,9 +1463,12 @@ const ReportDetail: React.FC = () => {
           </div>
 
           {/* Result */}
-          <div>
+          <div className="mt-2">
           <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
           Result
+          </div>
+          <div className="mt-1">
+          {formatResult(upload, isPrinting)}
           </div>
           </div>
           </motion.div>
