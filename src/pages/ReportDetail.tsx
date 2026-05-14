@@ -252,7 +252,7 @@ const VideoAnalysisSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ 
           {/* Class Confidences */}
           {v.class_confidences && (
             <div>
-              <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Confidence Breakdown</p>
+              <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Score</p>
               <div className="space-y-1 text-[10px]">
                 {Object.entries(v.class_confidences).map(([className, score]: [string, any]) => {
                   const pct = Number(score) * 100;
@@ -266,7 +266,7 @@ const VideoAnalysisSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ 
                             style={{ width: `${Math.min(100, pct)}%` }}
                           />
                         </div>
-                        <span className="text-gray-300 w-12 text-right">{pct.toFixed(1)}%</span>
+                        <span className="text-gray-300 w-12 text-right">{pct.toFixed(1)}</span>
                       </div>
                     </div>
                   );
@@ -648,7 +648,7 @@ const SuspiciousChunksTimeline: React.FC<{
       {displayedChunk && (
         <div className="mb-4 p-2 bg-red-900/10 border border-red-700/20 rounded">
           <p className="text-[9px] font-black text-red-400 uppercase mb-1.5">
-            {primary ? '⚠️ Primary Alert' : technical ? '🔍 Technical Proof' : '⚠️ Top Suspicious Chunk'}
+            {primaryRequiresImmediateReview ? '🚨 Immediate Review Required' : primary ? '⚠️ Primary Alert' : technical ? '🔍 Technical Proof' : '⚠️ Top Suspicious Chunk'}
           </p>
           <p className="text-[10px] text-gray-300">
             <span className="font-mono">

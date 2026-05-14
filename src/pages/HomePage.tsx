@@ -93,12 +93,12 @@ const Home: React.FC = () => {
     setResponseMessage({ status: null, message: "" });
 
     const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-    const MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100MB
+    const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB
     if (totalSize > MAX_TOTAL_SIZE) {
       setResponseMessage({
         status: "error",
         message:
-        "Total file size exceeds 100MB limit. Please reduce the number of files or their sizes.",
+        "Total file size exceeds 500MB limit. Please reduce the number of files or their sizes.",
       });
       setIsUploading(false);
       return;
