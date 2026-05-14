@@ -948,20 +948,6 @@ const ReportDetail: React.FC = () => {
   };
 
   const formatResult = (upload: FileUpload, forceExpand: boolean = false) => {
-    // Helper function to get label color
-    const getLabelColor = (label: string | undefined | null) => {
-      if (!label) return 'text-gray-400';
-      const lowerLabel = label.toLowerCase();
-      if (lowerLabel === 'real') return 'text-green-400';
-      if (lowerLabel === 'fake') return 'text-red-400';
-      return 'text-gray-400';
-    };
-
-    const capitalizeFirst = (str: string | undefined | null) => {
-      if (!str) return '';
-      return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-    };
-
     if (upload.file_status === 'error') {
       return (
         <div>
@@ -1012,15 +998,26 @@ const ReportDetail: React.FC = () => {
     if (upload.file_status === 'complete') {
       // Image Analysis (standalone, no grid needed)
       if (upload.result?.image_result && upload.file_metadata.content_type.toLowerCase().includes('image')) {
+        const label = upload.result.image_result.label_image || 'UNKNOWN';
         return (
-          <div className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
-          <h4 className="text-sm font-semibold text-orange-300 mb-1">Image Analysis</h4>
-          <p className="text-xs text-gray-400">
-          Verdict:{' '}
-          <span className={getLabelColor(upload.result.image_result.label_image)}>
-          {capitalizeFirst(upload.result.image_result.label_image)}
-          </span>
-          </p>
+          <div className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Image Analysis</h4>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-black px-2 py-0.5 rounded ${label.toLowerCase() === 'real' ? 'bg-green-900/40 text-green-400' : (label.toLowerCase() === 'fake' ? 'bg-red-900/40 text-red-400' : 'bg-gray-800 text-gray-400')}`}>
+                  {label.toUpperCase()}
+                </span>
+              </div>
+
+              {upload.result.image_result.score_image !== undefined && (
+                <div className="space-y-1 text-[10px] text-gray-400">
+                  <p>Confidence: <span className="text-gray-300">{(upload.result.image_result.score_image * 100).toFixed(2)}%</span></p>
+                </div>
+              )}
+            </div>
           </div>
         );
       }
@@ -1069,62 +1066,52 @@ const ReportDetail: React.FC = () => {
         };
 
         audioBlock = (
-          <div key="audio-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
-          <h4 className="text-sm font-semibold text-purple-300 mb-1">Audio Analysis:</h4>
+          <div key="audio-analysis" className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Audio Analysis</h4>
+            </div>
 
-          {isNoSpeech ? (
-            <>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-black px-2 py-0.5 rounded ${getAudioVerdictPillClass('No Speech Detected')}`}>
-                No Speech Detected
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-black px-2 py-0.5 rounded ${verdict.toLowerCase() === 'real' ? 'bg-green-900/40 text-green-400' : (verdict.toLowerCase() === 'fake' ? 'bg-red-900/40 text-red-400' : 'bg-gray-800 text-gray-400')}`}>
+                  {verdict || 'UNKNOWN'}
+                </span>
+              </div>
+
+              <div className="space-y-1 text-[10px] text-gray-400">
+                {isNoSpeech ? (
+                  <>
+                    <p className="text-yellow-600 italic">
+                      The audio track contains no detectable speech and could not be analysed. The file may be silent or contain only background noise.
+                    </p>
+                    {procTime > 0 && (
+                      <p>Processing Time: <span className="text-gray-300">{procTime.toFixed(2)}s</span></p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p>Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span></p>
+                    <p>Real Confidence: <span className="text-green-300">{(avgRealConfidence * 100).toFixed(2)}%</span></p>
+                    <p>Processing Time: <span className="text-gray-300">{procTime > 0 ? procTime.toFixed(2) : 'N/A'}s</span></p>
+                    {avgInf > 0 && (
+                      <p>Avg Inference: <span className="text-gray-300">{avgInf.toFixed(2)} ms</span></p>
+                    )}
+                    {duration > 0 && (
+                      <p>Audio Duration: <span className="text-gray-300">{duration.toFixed(2)}s</span></p>
+                    )}
+                    {(a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name) && (
+                      <p>Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name}</span>
+                      {(a.language_confidence || a.audio_prediction_raw?.language_confidence) && <span className="opacity-60 ml-1">(Conf: {((a.language_confidence || a.audio_prediction_raw?.language_confidence) * 100).toFixed(1)}%)</span>}
+                      </p>
+                    )}
+                    {a.error && (
+                      <p className="text-red-400 mt-1">Error: {a.error}</p>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-yellow-600 mt-1">
-            The audio track contains no detectable speech and could not be analysed. The file may be silent or contain only background noise.
-            </p>
-            {procTime > 0 && (
-              <p className="text-xs text-gray-400 mt-1">
-              Processing Time: <span className="text-gray-300">{procTime.toFixed(2)}s</span>
-              </p>
-            )}
-            </>
-          ) : (
-            <>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-black px-2 py-0.5 rounded ${getAudioVerdictPillClass(verdict)}`}>
-                {capitalizeFirst(verdict)}
-              </span>
-            </div>
-            <p className="text-xs text-gray-400">
-            Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span>
-            </p>
-            <p className="text-xs text-gray-400">
-            Real Confidence: <span className="text-green-300">{(avgRealConfidence * 100).toFixed(2)}%</span>
-            </p>
-            <p className="text-xs text-gray-400">
-            Processing Time: <span className="text-gray-300">{procTime > 0 ? procTime.toFixed(2) : 'N/A'}s</span>
-            </p>
-            {avgInf > 0 && (
-              <p className="text-xs text-gray-400">
-              Avg Inference: <span className="text-gray-300">{avgInf.toFixed(2)} ms</span>
-              </p>
-            )}
-            {duration > 0 && (
-              <p className="text-xs text-gray-400">
-              Audio Duration: <span className="text-gray-300">{duration.toFixed(2)}s</span>
-              </p>
-            )}
-            {(a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name) && (
-              <p className="text-xs text-gray-400">
-              Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name}</span>
-              {(a.language_confidence || a.audio_prediction_raw?.language_confidence) && <span className="opacity-60 ml-1">(Conf: {((a.language_confidence || a.audio_prediction_raw?.language_confidence) * 100).toFixed(1)}%)</span>}
-              </p>
-            )}
-            {a.error && (
-              <p className="text-xs text-red-400 mt-1">
-              Error: {a.error}
-              </p>
-            )}
+
             {/* Suspicious chunks timeline — handles both performance, performance_metrics, and audio_highlights structures */}
             {((a.performance?.chunking?.enabled || a.performance_metrics?.chunking?.enabled || a.audio_highlights || a.audio_prediction_raw?.highlights) &&
                (a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || a.audio_highlights || a.audio_prediction_raw?.highlights || a.real_window_insights || a.audio_prediction_raw?.real_window_insights)) && (
@@ -1135,8 +1122,6 @@ const ReportDetail: React.FC = () => {
                 forceExpand={forceExpand}
                 />
               )}
-              </>
-          )}
           </div>
         );
       }
