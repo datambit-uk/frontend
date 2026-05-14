@@ -612,19 +612,13 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
 };
 
 const SuspiciousChunksTimeline: React.FC<{ 
-  chunks: SuspiciousChunk[]; 
-  duration: number;
   audioWindows?: AudioWindow[];
   highlights?: AudioHighlights;
   realInsights?: RealWindowInsight[];
   forceExpand?: boolean;
-}> = ({ chunks, duration, highlights, realInsights }) => {
+}> = ({ highlights, realInsights, forceExpand }) => {
   const [showAllRealInsights, setShowAllRealInsights] = useState(false);
   const hasRealInsights = (realInsights?.length ?? 0) > 0;
-  const maxChunkEnd = chunks.length > 0 ? Math.max(...chunks.map(c => c.end_sec)) : 0;
-  const maxRealInsightEnd = hasRealInsights ? Math.max(...(realInsights || []).map(r => r.end_sec)) : 0;
-  const computedDuration = Math.max(maxChunkEnd, maxRealInsightEnd, 0);
-  const totalDuration = duration > 0 ? duration : computedDuration;
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -637,41 +631,77 @@ const SuspiciousChunksTimeline: React.FC<{
   const primaryImportanceLabel = String((primary as any)?.importance_label || "").toUpperCase();
   const primaryIsFake = String((primary as any)?.verdict || "").toUpperCase() === "FAKE";
   const primaryRequiresImmediateReview = Boolean(primary && primaryIsFake && primaryImportanceLabel === "CRITICAL");
-
-  // Fallback to top chunk if no highlights
-  const topChunk = chunks.length > 0 ? chunks[0] : null;
-  const displayedChunk = primary || technical || topChunk;
+  const displayedRealInsights = (showAllRealInsights || forceExpand) ? (realInsights || []) : (realInsights || []).slice(0, 1);
 
   return (
     <div className="mt-4 pt-3 border-t border-gray-700/30">
-      {/* Display Primary Alert or Top Chunk Summary */}
-      {displayedChunk && (
+      {(primary || technical) && (
+        <p className="text-[10px] font-black text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Analysis Highlights
+        </p>
+      )}
+
+      {primary && (
         <div className="mb-4 p-2 bg-red-900/10 border border-red-700/20 rounded">
           <p className="text-[9px] font-black text-red-400 uppercase mb-1.5">
-            {primaryRequiresImmediateReview ? '🚨 Immediate Review Required' : primary ? '⚠️ Primary Alert' : technical ? '🔍 Technical Proof' : '⚠️ Top Suspicious Chunk'}
+            {primaryRequiresImmediateReview ? '🚨 Requires Immediate Review' : 'Most Crucial Window'}
           </p>
-          <p className="text-[10px] text-gray-300">
+          <p className="text-[10px] text-gray-300 flex items-center gap-2">
             <span className="font-mono">
-              {formatTime((displayedChunk as any).start_sec || (displayedChunk as any).chunk_index * 5)} 
-              {' → '}
-              {formatTime((displayedChunk as any).end_sec || ((displayedChunk as any).chunk_index + 1) * 5)}
+              {formatTime((primary as any).start_sec || 0)} {' → '} {formatTime((primary as any).end_sec || 0)}
             </span>
+            {(primary as any).fake_confidence !== undefined && (
+              <span className="text-red-300">
+                Confidence: {(((primary as any).fake_confidence || 0) * 100).toFixed(1)}%
+              </span>
+            )}
           </p>
-          {(displayedChunk as any).fake_confidence !== undefined && (
-            <p className="text-[10px] text-red-300 mt-1">
-              Confidence: {(((displayedChunk as any).fake_confidence || 0) * 100).toFixed(1)}%
-            </p>
+
+          <div className="flex items-center gap-2 text-[10px] mt-1">
+            <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
+            <span className="text-red-300 font-semibold">{(primary as any).importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
+            {(primary as any).importance_score !== undefined && (
+              <span className="text-gray-400">
+                Score: {(Number((primary as any).importance_score) * 100).toFixed(1)}%
+              </span>
+            )}
+          </div>
+
+          {(primary as any).transcription && (
+            <div className="mt-1">
+              <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
+              <p className="text-[10px] text-gray-400 mt-1 italic">"{(primary as any).transcription}"</p>
+            </div>
           )}
-          {(displayedChunk as any).transcription && (
-            <p className="text-[10px] text-gray-400 mt-1 italic">"{(displayedChunk as any).transcription}"</p>
-          )}
-          {(displayedChunk as any).importance_rationale && (
-            <p className="text-[10px] text-gray-400 mt-1">{(displayedChunk as any).importance_rationale}</p>
+
+          {(primary as any).importance_rationale && (
+            <div className="mt-1">
+              <p className="text-[9px] font-black text-gray-500 uppercase">Rationale</p>
+              <p className="text-[10px] text-gray-400 mt-1">{(primary as any).importance_rationale}</p>
+            </div>
           )}
         </div>
       )}
 
-      {/* Real Insights */}
+      {technical && (
+        <div className="mb-4 p-2 bg-purple-900/10 border border-purple-700/20 rounded">
+          <p className="text-[9px] font-black text-purple-400 uppercase mb-1.5">Forensic Proof</p>
+          <p className="text-[10px] text-gray-300 flex items-center gap-2">
+            <span className="font-mono">
+              {formatTime((technical as any).start_sec || 0)} {' → '} {formatTime((technical as any).end_sec || 0)}
+            </span>
+            {(technical as any).fake_confidence !== undefined && (
+              <span className="text-purple-300">
+                Confidence: {(((technical as any).fake_confidence || 0) * 100).toFixed(1)}%
+              </span>
+            )}
+          </p>
+        </div>
+      )}
+
       {hasRealInsights && (
         <div className="mb-4 p-2 bg-green-900/10 border border-green-700/20 rounded">
           <div className="flex items-center gap-1 mb-1">
@@ -686,47 +716,40 @@ const SuspiciousChunksTimeline: React.FC<{
             )}
           </div>
           
-          {realInsights && (
-            <div className="space-y-1">
-              {realInsights.slice(0, showAllRealInsights ? undefined : 1).map((insight, i) => (
-                <div key={i} className="text-[10px] text-gray-300 bg-black/20 p-1.5 rounded">
-                  <p className="font-mono">
-                    {formatTime(insight.start_sec)} → {formatTime(insight.end_sec)}
-                    {insight.importance_label && <span className="ml-2 text-green-300">({insight.importance_label})</span>}
-                  </p>
-                  {insight.transcription && <p className="text-gray-400 italic mt-0.5">"{insight.transcription}"</p>}
-                  {insight.importance_rationale && <p className="text-gray-400 text-[9px] mt-0.5">{insight.importance_rationale}</p>}
+          <div className="space-y-1">
+            {displayedRealInsights.map((insight, i) => (
+              <div key={i} className="text-[10px] text-gray-300 bg-black/20 p-1.5 rounded">
+                <p className="font-mono mb-1">
+                  {formatTime(insight.start_sec)} → {formatTime(insight.end_sec)}
+                </p>
+
+                <div className="flex items-center gap-2 text-[10px] mb-1">
+                  <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
+                  <span className="text-green-300 font-semibold">{insight.importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
+                  {insight.importance_score !== undefined && (
+                    <span className="text-gray-400">Score: {(insight.importance_score * 100).toFixed(1)}%</span>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+
+                {insight.transcription && (
+                  <div className="mb-1">
+                    <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
+                    <p className="text-gray-400 italic mt-0.5">"{insight.transcription}"</p>
+                  </div>
+                )}
+
+                {insight.importance_rationale && (
+                  <div>
+                    <p className="text-[9px] font-black text-gray-500 uppercase">Rationale</p>
+                    <p className="text-gray-400 text-[9px] mt-0.5">{insight.importance_rationale}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Timeline Visualization */}
-      {chunks.length > 0 && (
-        <div className="p-2 bg-black/30 rounded">
-          <p className="text-[9px] text-gray-500 uppercase font-bold mb-1.5">Timeline ({chunks.length} suspicious)</p>
-          <div className="relative h-8 bg-black/50 rounded-full border border-gray-700/50 overflow-hidden mb-2">
-            <div className="absolute inset-0 flex items-center">
-              {chunks.map((chunk, i) => (
-                <div
-                  key={i}
-                  className="bg-red-500 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                  style={{
-                    left: `${(chunk.start_sec / totalDuration) * 100}%`,
-                    width: `${((chunk.end_sec - chunk.start_sec) / totalDuration) * 100}%`,
-                    height: '100%',
-                    minWidth: '2px',
-                  }}
-                  title={`Chunk ${chunk.rank}: ${formatTime(chunk.start_sec)}-${formatTime(chunk.end_sec)}`}
-                />
-              ))}
-            </div>
-          </div>
-          <p className="text-[9px] text-gray-400">0:00 ─ {formatTime(totalDuration)}</p>
-        </div>
-      )}
     </div>
   );
 };
@@ -1037,6 +1060,13 @@ const ReportDetail: React.FC = () => {
           : realConf;
 
         const isNoSpeech = verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
+        const getAudioVerdictPillClass = (v: string) => {
+          const lower = String(v || '').toLowerCase();
+          if (lower === 'real') return 'bg-green-900/40 text-green-400';
+          if (lower === 'fake') return 'bg-red-900/40 text-red-400';
+          if (lower.includes('no speech')) return 'bg-yellow-900/40 text-yellow-400';
+          return 'bg-gray-800 text-gray-400';
+        };
 
         audioBlock = (
           <div key="audio-analysis" className="p-3 border border-gray-700 rounded-lg bg-gray-800/40">
@@ -1044,10 +1074,11 @@ const ReportDetail: React.FC = () => {
 
           {isNoSpeech ? (
             <>
-            <p className="text-xs text-gray-400">
-            Verdict:{' '}
-            <span className="text-yellow-400">No Speech Detected</span>
-            </p>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-black px-2 py-0.5 rounded ${getAudioVerdictPillClass('No Speech Detected')}`}>
+                No Speech Detected
+              </span>
+            </div>
             <p className="text-xs text-yellow-600 mt-1">
             The audio track contains no detectable speech and could not be analysed. The file may be silent or contain only background noise.
             </p>
@@ -1059,10 +1090,11 @@ const ReportDetail: React.FC = () => {
             </>
           ) : (
             <>
-            <p className="text-xs text-gray-400">
-            Verdict:{' '}
-            <span className={getLabelColor(verdict)}>{capitalizeFirst(verdict)}</span>
-            </p>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-black px-2 py-0.5 rounded ${getAudioVerdictPillClass(verdict)}`}>
+                {capitalizeFirst(verdict)}
+              </span>
+            </div>
             <p className="text-xs text-gray-400">
             Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span>
             </p>
@@ -1097,8 +1129,6 @@ const ReportDetail: React.FC = () => {
             {((a.performance?.chunking?.enabled || a.performance_metrics?.chunking?.enabled || a.audio_highlights || a.audio_prediction_raw?.highlights) &&
                (a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || a.audio_highlights || a.audio_prediction_raw?.highlights || a.real_window_insights || a.audio_prediction_raw?.real_window_insights)) && (
                 <SuspiciousChunksTimeline
-                chunks={a.performance?.chunking?.top_suspicious_chunks || a.suspicious_chunks || []}
-                duration={duration}
                 audioWindows={a.audio_windows}
                 highlights={a.audio_highlights || a.audio_prediction_raw?.highlights}
                 realInsights={a.real_window_insights || a.audio_prediction_raw?.real_window_insights}
