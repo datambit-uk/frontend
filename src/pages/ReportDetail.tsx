@@ -1057,13 +1057,6 @@ const ReportDetail: React.FC = () => {
           : realConf;
 
         const isNoSpeech = verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
-        const getAudioVerdictPillClass = (v: string) => {
-          const lower = String(v || '').toLowerCase();
-          if (lower === 'real') return 'bg-green-900/40 text-green-400';
-          if (lower === 'fake') return 'bg-red-900/40 text-red-400';
-          if (lower.includes('no speech')) return 'bg-yellow-900/40 text-yellow-400';
-          return 'bg-gray-800 text-gray-400';
-        };
 
         audioBlock = (
           <div key="audio-analysis" className="h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
