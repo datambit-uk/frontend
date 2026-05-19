@@ -755,36 +755,76 @@ const SuspiciousChunksTimeline: React.FC<{
 };
 
 const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
-  if (!urls || urls.length === 0) return null;
+  const safeUrls = Array.isArray(urls)
+    ? urls.filter((u): u is string => typeof u === "string" && u.trim().length > 0)
+    : [];
+  if (safeUrls.length === 0) return null;
+
+  const normalizeHeatmapUrl = (rawUrl: string) => {
+    if (!rawUrl) return rawUrl;
+    let normalized = rawUrl.trim();
+    if (normalized.startsWith("gs://")) {
+      normalized = normalized.replace("gs://", "https://storage.googleapis.com/");
+    }
+    if (normalized.startsWith("storage.googleapis.com/")) {
+      normalized = `https://${normalized}`;
+    }
+    if (
+      !normalized.startsWith("data:") &&
+      !normalized.startsWith("http://") &&
+      !normalized.startsWith("https://") &&
+      !normalized.startsWith("/") &&
+      normalized.includes("/")
+    ) {
+      normalized = `${window.location.origin}/${normalized}`;
+    }
+    if (
+      !normalized.startsWith("data:") &&
+      !normalized.startsWith("http://") &&
+      !normalized.startsWith("https://") &&
+      normalized.startsWith("/")
+    ) {
+      normalized = `${window.location.origin}${normalized}`;
+    }
+    return normalized;
+  };
 
   return (
     <div className="mt-3">
     <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Video Heatmaps</h4>
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-    {urls.map((url, i) => {
-      // If it's base64, render directly; if it's a URL, link to it
-      const isBase64 = url.startsWith('data:');
-      const isUrl = url.startsWith('http');
+    {safeUrls.map((url, i) => {
+      const normalizedUrl = normalizeHeatmapUrl(url);
+      const isVideo =
+        normalizedUrl.startsWith("data:video/") ||
+        /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(normalizedUrl);
+      const canRenderMedia =
+        normalizedUrl.startsWith("data:") ||
+        normalizedUrl.startsWith("http://") ||
+        normalizedUrl.startsWith("https://");
 
       return (
         <div key={i} className="relative group aspect-video bg-black/50 rounded-lg overflow-hidden border border-gray-700/50 hover:border-orange-400/50 transition-all">
-        {isBase64 && (
+        {canRenderMedia && isVideo && (
+          <video
+          src={normalizedUrl}
+          className="w-full h-full object-cover"
+          controls
+          muted
+          playsInline
+          preload="metadata"
+          />
+        )}
+        {canRenderMedia && !isVideo && (
           <img
-          src={url}
+          src={normalizedUrl}
           alt={`Heatmap ${i + 1}`}
           className="w-full h-full object-cover"
           />
         )}
-        {isUrl && (
-          <img
-          src={url}
-          alt={`Heatmap ${i + 1}`}
-          className="w-full h-full object-cover"
-          />
-        )}
-        {!isBase64 && !isUrl && (
+        {!canRenderMedia && (
           <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs text-center p-2">
-          <span>{url.substring(0, 20)}...</span>
+          <span>Unable to preview heatmap</span>
           </div>
         )}
         </div>
@@ -1015,11 +1055,14 @@ const ReportDetail: React.FC = () => {
       let audioBlock: React.ReactElement | null = null;
 
       if (hasVideoAnalysis) {
-        const heatmapUrls = upload.result!.heatmap_url || upload.result!.heatmap_paths;
+        const heatmapUrls = [
+          ...(upload.result!.heatmap_url || []),
+          ...(upload.result!.heatmap_paths || []),
+        ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
         videoBlock = (
           <div key="video-analysis" className="h-full">
             <VideoAnalysisSection data={upload.result!.video_analysis} forceExpand={forceExpand} />
-            {heatmapUrls && <HeatmapSection urls={heatmapUrls} />}
+            {heatmapUrls.length > 0 && <HeatmapSection urls={heatmapUrls} />}
           </div>
         );
       }
