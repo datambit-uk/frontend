@@ -758,8 +758,8 @@ const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
   if (!urls || urls.length === 0) return null;
 
   return (
-    <div>
-    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-3">Video Heatmaps</h4>
+    <div className="mt-3">
+    <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Video Heatmaps</h4>
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
     {urls.map((url, i) => {
       // If it's base64, render directly; if it's a URL, link to it
@@ -786,21 +786,6 @@ const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
           <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs text-center p-2">
           <span>{url.substring(0, 20)}...</span>
           </div>
-        )}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-        <span className="text-[9px] text-gray-300 font-medium truncate block">forensic_node_{i+1}</span>
-        </div>
-        {isUrl && (
-          <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-orange-600 rounded transition-all"
-          >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          </a>
         )}
         </div>
       );
@@ -1030,9 +1015,11 @@ const ReportDetail: React.FC = () => {
       let audioBlock: React.ReactElement | null = null;
 
       if (hasVideoAnalysis) {
+        const heatmapUrls = upload.result!.heatmap_url || upload.result!.heatmap_paths;
         videoBlock = (
           <div key="video-analysis" className="h-full">
             <VideoAnalysisSection data={upload.result!.video_analysis} forceExpand={forceExpand} />
+            {heatmapUrls && <HeatmapSection urls={heatmapUrls} />}
           </div>
         );
       }
@@ -1134,11 +1121,6 @@ const ReportDetail: React.FC = () => {
           </div>
         )}
         </div>
-
-        {/* Heatmaps BELOW */}
-        {(upload.result?.heatmap_url || upload.result?.heatmap_paths) && (
-          <HeatmapSection urls={upload.result.heatmap_url || upload.result.heatmap_paths} />
-        )}
 
         </div>
       );
