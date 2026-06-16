@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { Shield, Users, SlidersHorizontal, UserCog } from 'lucide-react';
+import { Shield, Users, SlidersHorizontal, UserCog, KeyRound } from 'lucide-react';
 import GroupsTab from '../components/admin/GroupsTab';
 import TemplatesTab from '../components/admin/TemplatesTab';
 import UsersTab from '../components/admin/UsersTab';
+import AccessTab from '../components/admin/AccessTab';
 
-type TabKey = 'groups' | 'templates' | 'users';
+type TabKey = 'groups' | 'templates' | 'users' | 'access';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'groups', label: 'Groups', icon: <Users size={16} /> },
   { key: 'templates', label: 'Templates', icon: <SlidersHorizontal size={16} /> },
   { key: 'users', label: 'Users', icon: <UserCog size={16} /> },
+  { key: 'access', label: 'Access', icon: <KeyRound size={16} /> },
 ];
 
 const AdminConsole: React.FC = () => {
@@ -40,6 +42,7 @@ const AdminConsole: React.FC = () => {
       {tab === 'groups' && <GroupsTab />}
       {tab === 'templates' && <TemplatesTab />}
       {tab === 'users' && <UsersTab />}
+      {tab === 'access' && <AccessTab />}
     </div>
   );
 };

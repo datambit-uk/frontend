@@ -1,5 +1,18 @@
 // Shared types for the Admin Console tabs.
 
+// Auth-service `roles` table. Single source of truth for role dropdowns/labels.
+export const ROLE_OPTIONS = [
+  { id: 4, label: 'Admin' },
+  { id: 5, label: 'User' },
+  { id: 6, label: 'Internal' },
+  { id: 7, label: 'Tester' },
+  { id: 8, label: 'Dev' },
+  { id: 10, label: 'Black Label' },
+] as const;
+
+export const roleLabel = (id: number | null | undefined): string =>
+  id == null ? '—' : (ROLE_OPTIONS.find((r) => r.id === id)?.label ?? `Role ${id}`);
+
 export interface TemplateSummary {
   id: string;
   name: string;

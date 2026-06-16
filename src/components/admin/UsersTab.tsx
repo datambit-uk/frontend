@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiCall } from '../../api/api';
 import { AlertCircle, ChevronDown, ChevronRight, X } from 'lucide-react';
-import { UserRow, TemplateSummary, OverrideInfo, Scope } from './types';
-
-const ROLE_LABELS: Record<number, string> = { 4: 'Platform Admin', 1: 'Member' };
+import { UserRow, TemplateSummary, OverrideInfo, Scope, roleLabel } from './types';
 
 const UsersTab: React.FC = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -121,7 +119,7 @@ const UsersTab: React.FC = () => {
                       {u.email}
                     </button>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400">{u.role_id != null ? (ROLE_LABELS[u.role_id] ?? `Role ${u.role_id}`) : '—'}</td>
+                  <td className="px-6 py-4 text-sm text-gray-400">{roleLabel(u.role_id)}</td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => toggle(u.user_id)} className="text-blue-400 text-sm">{expandedId === u.user_id ? 'Hide' : 'Manage'}</button>
                   </td>
