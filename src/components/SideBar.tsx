@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
   const visibleNavItems = useMemo(() => {
     const items = [...navItems];
     if (isAdmin) {
-      items.push({ label: "Admin", path: "/group-management", icon: <Shield className="w-6 h-6" /> });
+      items.push({ label: "Admin Console", path: "/group-management", icon: <Shield className="w-6 h-6" /> });
       items.push({ label: "License Test", path: "/license-test", icon: <Shield className="w-6 h-6" /> });
     }
     return items;

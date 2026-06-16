@@ -14,7 +14,7 @@ import SupportPage from '../pages/SupportPage';
 import AnalysisPage from '../pages/AnalysisPage';
 import RecentFileUploads from '../pages/RecentFileUploads';
 import UsageDashboard from '../pages/UsageDashboard';
-import GroupManagement from '../pages/GroupManagement';
+import AdminConsole from '../pages/AdminConsole';
 import LicenseTestDashboard from '../pages/LicenseTestDashboard';
 import LicenseSettings from '../pages/LicenseSettings';
 
@@ -45,7 +45,7 @@ const AppRouter: React.FC = () => {
             <Route path="support" element={<SupportPage />} />
             <Route path="analysis" element={<AnalysisPage/>}/>
             <Route path="usage" element={<UsageDashboard />} />
-            <Route path="group-management" element={<GroupManagement />} />
+            <Route path="group-management" element={<AdminConsole />} />
             <Route path="license-test" element={<LicenseTestDashboard />} />
             <Route path="settings/license" element={<LicenseSettings />} />
           </Route>
