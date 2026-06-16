@@ -16,6 +16,7 @@ import RecentFileUploads from '../pages/RecentFileUploads';
 import UsageDashboard from '../pages/UsageDashboard';
 import GroupManagement from '../pages/GroupManagement';
 import LicenseTestDashboard from '../pages/LicenseTestDashboard';
+import LicenseSettings from '../pages/LicenseSettings';
 
 const AppRouter: React.FC = () => {
   return (
@@ -37,7 +38,7 @@ const AppRouter: React.FC = () => {
             }
           >
             <Route path="home" element={<Home />} />
-            <Route path="all-uploads" element={ <RecentFileUploads/>}/> 
+            <Route path="all-uploads" element={ <RecentFileUploads/>}/>
             <Route path="recent-upload" element={<Report />} />
             <Route path="report/:uploadId" element={<ReportDetail />} />
             <Route path="report/:uploadId/:contentType" element={<ReportDetail />} />
@@ -46,6 +47,7 @@ const AppRouter: React.FC = () => {
             <Route path="usage" element={<UsageDashboard />} />
             <Route path="group-management" element={<GroupManagement />} />
             <Route path="license-test" element={<LicenseTestDashboard />} />
+            <Route path="settings/license" element={<LicenseSettings />} />
           </Route>
 
           {/* 404 Route - This will catch all unmatched routes */}

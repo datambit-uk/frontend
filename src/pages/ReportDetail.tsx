@@ -843,7 +843,7 @@ const ReportDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasProcessingItems, setHasProcessingItems] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
-  const pollingInterval = useRef<number | null>(null);
+  const pollingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const POLL_INTERVAL = 10000; // 10 seconds
   const navigate = useNavigate();
 

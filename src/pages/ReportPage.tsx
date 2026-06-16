@@ -57,7 +57,7 @@ const Report: React.FC = () => {
   const [hasPrev, setHasPrev] = useState<boolean>(false);
   const pageSize = 10;
   const [hasProcessingItems, setHasProcessingItems] = useState<boolean>(false);
-  const pollingInterval = useRef<number | null>(null);
+  const pollingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const POLL_INTERVAL = 10000; // 10 seconds
 
   const contentTypes = [

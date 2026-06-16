@@ -149,7 +149,7 @@ const Home: React.FC = () => {
         xhr.timeout = 180000; // 3 minutes
 
         let lastProgress = 0;
-        let noProgressTimer: number | null = null;
+        let noProgressTimer: ReturnType<typeof setTimeout> | null = null;
 
         const resetNoProgressTimer = () => {
           if (noProgressTimer) clearTimeout(noProgressTimer);
