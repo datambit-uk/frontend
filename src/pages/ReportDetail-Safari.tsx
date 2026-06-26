@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { apiCall, API_URL } from "../api/api";
+import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 
 interface FileMetadata {
@@ -761,74 +761,36 @@ const SuspiciousChunksTimeline: React.FC<{
 };
 
 const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
-  const safeUrls = Array.isArray(urls)
-    ? urls.filter((u): u is string => typeof u === "string" && u.trim().length > 0)
-    : [];
-  if (safeUrls.length === 0) return null;
-
-  const normalizeHeatmapUrl = (rawUrl: string) => {
-    if (!rawUrl) return rawUrl;
-    let normalized = rawUrl.trim();
-    
-    // GCS normalization
-    if (normalized.startsWith("gs://")) {
-      normalized = normalized.replace("gs://", "https://storage.googleapis.com/");
-    }
-    
-    // If it's already a full URL or base64, return it
-    if (
-      normalized.startsWith("data:") ||
-      normalized.startsWith("http://") ||
-      normalized.startsWith("https://")
-    ) {
-      return normalized;
-    }
-
-    // If it's a relative path starting with /, prepend API_URL
-    if (normalized.startsWith("/")) {
-        return `${API_URL}${normalized}`;
-    }
-    
-    // Otherwise assume it's relative to root and prepend API_URL/
-    return `${API_URL}/${normalized}`;
-  };
+  if (!urls || urls.length === 0) return null;
 
   return (
     <div className="mt-3">
     <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Video Heatmaps</h4>
     <div className="flex flex-col gap-4">
-    {safeUrls.map((url, i) => {
-      const normalizedUrl = normalizeHeatmapUrl(url);
-      const isVideo =
-        normalizedUrl.startsWith("data:video/") ||
-        /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(normalizedUrl);
-      const canRenderMedia =
-        normalizedUrl.startsWith("data:") ||
-        normalizedUrl.startsWith("http://") ||
-        normalizedUrl.startsWith("https://");
+    {urls.map((url, i) => {
+      // If it's base64, render directly; if it's a URL, link to it
+      const isBase64 = url.startsWith('data:');
+      const isUrl = url.startsWith('http');
 
       return (
         <div key={i} className="relative group bg-black/50 rounded-lg overflow-hidden border border-gray-700/50 hover:border-orange-400/50 transition-all w-full">
-        {canRenderMedia && isVideo && (
-          <video
-          src={normalizedUrl}
-          className="w-full h-auto block"
-          controls
-          muted
-          playsInline
-          preload="metadata"
-          />
-        )}
-        {canRenderMedia && !isVideo && (
+        {isBase64 && (
           <img
-          src={normalizedUrl}
+          src={url}
           alt={`Heatmap ${i + 1}`}
           className="w-full h-auto block"
           />
         )}
-        {!canRenderMedia && (
+        {isUrl && (
+          <img
+          src={url}
+          alt={`Heatmap ${i + 1}`}
+          className="w-full h-auto block"
+          />
+        )}
+        {!isBase64 && !isUrl && (
           <div className="w-full aspect-video flex items-center justify-center text-gray-500 text-xs text-center p-2">
-          <span>Unable to preview heatmap</span>
+          <span>{url.substring(0, 20)}...</span>
           </div>
         )}
         </div>
@@ -847,7 +809,7 @@ const ReportDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasProcessingItems, setHasProcessingItems] = useState<boolean>(false);
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
-  const pollingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingInterval = useRef<number | null>(null);
   const POLL_INTERVAL = 10000; // 10 seconds
   const navigate = useNavigate();
 
@@ -1059,10 +1021,7 @@ const ReportDetail: React.FC = () => {
       let audioBlock: React.ReactElement | null = null;
 
       if (hasVideoAnalysis) {
-        const heatmapUrls = [
-          ...(upload.result!.heatmap_url || []),
-          ...(upload.result!.heatmap_paths || []),
-        ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+        const heatmapUrls = upload.result!.heatmap_url || upload.result!.heatmap_paths;
         videoBlock = (
           <div key="video-analysis" className="min-h-full">
             <VideoAnalysisSection 
@@ -1215,7 +1174,7 @@ const ReportDetail: React.FC = () => {
     <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="w-full min-h-full"
+    className="w-full h-full"
     >
     <style dangerouslySetInnerHTML={{ __html: `
       @media print {
@@ -1237,8 +1196,8 @@ const ReportDetail: React.FC = () => {
       }
     ` }} />
 
-    <div className="w-full min-h-full">
-    <div className="flex flex-col gap-2 min-h-full py-1">
+    <div className="w-full h-full">
+    <div className="flex flex-col gap-2 h-full py-1">
     {/* Summary Section */}
     {fileUploads.length > 0 ? (
       <div className="flex flex-row flex-wrap items-center justify-between gap-4 py-2 px-1 mb-2 w-full">
@@ -1323,8 +1282,8 @@ const ReportDetail: React.FC = () => {
         transition={{ duration: 0.5, delay: 0.3 }}
         className="flex-1 bg-gray-800/30 backdrop-blur-sm rounded-2xl border border-gray-700/50 min-h-0"
         >
-        <div className="min-h-full overflow-hidden rounded-2xl">
-        <div className="min-h-full overflow-y-auto">
+        <div className="h-full overflow-hidden rounded-2xl">
+        <div className="h-full overflow-y-auto">
         {/* Desktop List View */}
         <div className="hidden md:block p-6">
         <div className="space-y-8">

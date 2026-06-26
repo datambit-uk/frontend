@@ -1,4 +1,4 @@
-const API_URL = "https://production.datambit.com";
+export const API_URL = "https://production.datambit.com";
 
 const headers = {
     "Content-Type": "application/json",
