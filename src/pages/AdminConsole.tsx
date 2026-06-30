@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Shield, Users, SlidersHorizontal, UserCog, KeyRound } from 'lucide-react';
+import { Shield, Users, SlidersHorizontal, UserCog, KeyRound, Settings } from 'lucide-react';
 import GroupsTab from '../components/admin/GroupsTab';
 import TemplatesTab from '../components/admin/TemplatesTab';
 import UsersTab from '../components/admin/UsersTab';
 import AccessTab from '../components/admin/AccessTab';
+import MaintenanceTab from '../components/admin/MaintenanceTab';
 
-type TabKey = 'groups' | 'templates' | 'users' | 'access';
+type TabKey = 'groups' | 'templates' | 'users' | 'access' | 'maintenance';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'groups', label: 'Groups', icon: <Users size={16} /> },
   { key: 'templates', label: 'Templates', icon: <SlidersHorizontal size={16} /> },
   { key: 'users', label: 'Users', icon: <UserCog size={16} /> },
   { key: 'access', label: 'Access', icon: <KeyRound size={16} /> },
+  { key: 'maintenance', label: 'Maintenance', icon: <Settings size={16} /> },
 ];
 
 const AdminConsole: React.FC = () => {
@@ -43,6 +45,7 @@ const AdminConsole: React.FC = () => {
       {tab === 'templates' && <TemplatesTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'access' && <AccessTab />}
+      {tab === 'maintenance' && <MaintenanceTab />}
     </div>
   );
 };

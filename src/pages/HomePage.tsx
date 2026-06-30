@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Video, Copy, Check, X, AlertTriangle } from "lucide-react";
 import Dropbox from "../components/Dropbox";
-import { MAINTENANCE_MODE } from "../config/maintenance";
+import { useMaintenance } from "../config/maintenance";
 
 interface UploadResponse {
   code: string;
@@ -11,7 +11,8 @@ interface UploadResponse {
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const showDropbox = !MAINTENANCE_MODE.isUploadDisabled;
+  const { uploadsDisabled, message: maintenanceMessage } = useMaintenance();
+  const showDropbox = !uploadsDisabled;
   const selectedCard = "Media";
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -78,8 +79,8 @@ const Home: React.FC = () => {
   };
 
   const uploadFiles = async () => {
-    if (MAINTENANCE_MODE.isUploadDisabled) {
-      alert(MAINTENANCE_MODE.message);
+    if (uploadsDisabled) {
+      alert(maintenanceMessage);
       return;
     }
 
@@ -250,7 +251,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-    {MAINTENANCE_MODE.isUploadDisabled && (
+    {uploadsDisabled && (
       <div className="bg-amber-900/40 border border-amber-500/50 rounded-2xl p-6 flex items-start gap-4 backdrop-blur-sm">
         <div className="p-2 bg-amber-500/20 rounded-lg">
           <AlertTriangle className="w-6 h-6 text-amber-500" />
@@ -258,7 +259,7 @@ const Home: React.FC = () => {
         <div>
           <h3 className="text-amber-500 font-bold text-lg">Uploads Temporarily Disabled</h3>
           <p className="text-amber-200/80 mt-1">
-            {MAINTENANCE_MODE.message}
+            {maintenanceMessage}
           </p>
         </div>
       </div>

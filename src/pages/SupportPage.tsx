@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image as Loader2, AlertCircle, Check, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supportService, SupportTicket } from '../services/supportService';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -9,16 +10,8 @@ interface FileWithPreview extends File {
 interface UploadError {
   file?: string;
   reason?: string;
+  subject?: string;
   general?: string;
-}
-
-interface SupportTicket {
-  created_at: string;
-  files: string[];
-  reason: string;
-  status: string;
-  ticket_id: string;
-  updated_at: string;
 }
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
@@ -28,6 +21,7 @@ const MAX_WORDS = 300;
 
 const SupportPage: React.FC = () => {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [subject, setSubject] = useState('');
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<UploadError>({});
@@ -50,12 +44,7 @@ const SupportPage: React.FC = () => {
     setFetchingTickets(true);
     setFetchError('');
     try {
-      const token = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
-      if (!token) throw new Error('Authentication token not found');
-      const res = await fetch('https://production.datambit.com/api/v2/auth/me/support-tickets', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const data = await supportService.getTickets();
       if (data.code === 'success') {
         setTickets(data.message);
       } else {
@@ -176,6 +165,16 @@ const SupportPage: React.FC = () => {
       return;
     }
 
+    if (!subject.trim()) {
+      setErrors(prev => ({ ...prev, subject: 'Please provide a subject' }));
+      return;
+    }
+
+    if (subject.trim().length > 255) {
+      setErrors(prev => ({ ...prev, subject: 'Subject cannot exceed 255 characters' }));
+      return;
+    }
+
     if (!reason.trim()) {
       setErrors(prev => ({ ...prev, reason: 'Please provide a reason' }));
       return;
@@ -195,12 +194,14 @@ const SupportPage: React.FC = () => {
       files.forEach((file) => {
         formData.append('files', file);
       });
+      formData.append('subject', subject);
       formData.append('reason', reason);
 
       const response = await uploadFiles(formData);
 
       setSuccess(`Support ticket created successfully! Ticket ID: ${response.message.ticket_id}`);
       setFiles([]);
+      setSubject('');
       setReason('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -266,6 +267,9 @@ const SupportPage: React.FC = () => {
                                 {ticket.status}
                               </span>
                             </div>
+                            {ticket.subject && (
+                              <div className="text-gray-100 font-semibold mb-1">{ticket.subject}</div>
+                            )}
                             <div className="text-gray-200 font-medium mb-1 cursor-pointer select-none flex items-center gap-2"
                               onClick={() => setExpandedReason(isReasonExpanded ? null : ticket.ticket_id)}>
                               <span>{reasonTruncated}</span>
@@ -298,8 +302,8 @@ const SupportPage: React.FC = () => {
                                       className="overflow-hidden"
                                     >
                                       <div className="flex flex-wrap gap-2 mb-2 mt-1">
-                                        {ticket.files.map((url, idx) => (
-                                          <img key={idx} src={url} alt="attachment" className="w-16 h-16 object-cover rounded border border-gray-700" />
+                                        {ticket.files.map((file, idx) => (
+                                          <img key={idx} src={file.file_url} alt={file.file_name || 'attachment'} className="w-16 h-16 object-cover rounded border border-gray-700" />
                                         ))}
                                       </div>
                                     </motion.div>
@@ -396,6 +400,34 @@ const SupportPage: React.FC = () => {
                 <p className="text-sm text-red-400 flex items-center">
                   <AlertCircle className="h-4 w-4 mr-1" />
                   {errors.file}
+                </p>
+              )}
+            </div>
+
+            {/* Subject Section */}
+            <div className="space-y-2">
+              <label htmlFor="subject" className="block text-sm font-medium text-gray-300">
+                Subject
+              </label>
+              <input
+                id="subject"
+                type="text"
+                value={subject}
+                onChange={(e) => {
+                  setSubject(e.target.value);
+                  setErrors(prev => ({ ...prev, subject: undefined }));
+                }}
+                maxLength={255}
+                className={`block w-full px-3 py-2 bg-gray-800 border ${
+                  errors.subject ? 'border-red-500' : 'border-gray-700'
+                } rounded-md shadow-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                placeholder="Brief summary of your issue"
+                disabled={isLoading}
+              />
+              {errors.subject && (
+                <p className="text-sm text-red-400 flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  {errors.subject}
                 </p>
               )}
             </div>
