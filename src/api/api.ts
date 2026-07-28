@@ -4,6 +4,44 @@ const headers = {
     "Content-Type": "application/json",
 };
 
+const NETWORK_ERROR_MESSAGE = "Can't reach the server. Check your connection and try again.";
+
+/**
+ * The request never reached the API — DNS, TLS, CORS or an offline client.
+ * Distinct from an API that responded with an error status.
+ */
+export class ApiNetworkError extends Error {
+    constructor(message: string = NETWORK_ERROR_MESSAGE) {
+        super(message);
+        this.name = "ApiNetworkError";
+        // Required for `instanceof` to survive down-level compilation.
+        Object.setPrototypeOf(this, ApiNetworkError.prototype);
+    }
+}
+
+// fetch() rejects with a TypeError for every transport-level failure, and the
+// browser's wording ("Load failed" in Safari, "Failed to fetch" in Chrome) is
+// meaningless to users. Callers surface `error.message` directly, so that raw
+// text must never escape this module.
+const request = async (url: string, options: RequestInit): Promise<Response> => {
+    try {
+        return await fetch(url, options);
+    } catch {
+        throw new ApiNetworkError();
+    }
+};
+
+// Error responses are not guaranteed to be JSON — a misrouted request can return
+// an HTML error page, whose parse failure would otherwise reach the UI as
+// "Unexpected token '<'".
+const parseJsonBody = async (response: Response) => {
+    try {
+        return await response.json();
+    } catch {
+        return null;
+    }
+};
+
 export interface ApiCallParams {
     endpoint: string;
     method?: string;
@@ -82,26 +120,35 @@ const refreshAuthToken = async (): Promise<boolean> => {
     }
     
     try {
-        const response = await fetch(`${API_URL}/auth/refresh`, {
+        const response = await request(`${API_URL}/auth/refresh`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${refreshToken}`,
-            }, 
+            },
             mode: "cors"
         });
-        
+
         if (!response.ok) {
             throw new Error("Token refresh failed");
         }
-        
-        const data = await response.json();
-        
+
+        const data = await parseJsonBody(response);
+
+        if (!data?.message) {
+            throw new Error("Token refresh failed");
+        }
+
         const useSessionStorage = !localStorage.getItem('jwtToken') && !!sessionStorage.getItem('jwtToken');
         saveTokens(data.message, refreshToken, useSessionStorage);
-        
+
         return true;
     } catch (error) {
+        // An unreachable server is not an expired session — let it propagate so the
+        // caller reports a connection problem instead of forcing a logout.
+        if (error instanceof ApiNetworkError) {
+            throw error;
+        }
         console.error("Failed to refresh token:", error);
         return false;
     } finally {
@@ -167,7 +214,7 @@ export const apiCall = async ({
     }
 
     // First attempt
-    let response = await fetch(url, options);
+    let response = await request(url, options);
     
     // If unauthorized and we haven't tried refreshing yet
     if (auto_refresh && response.status === 401 ) {
@@ -183,7 +230,7 @@ export const apiCall = async ({
                 };
                 
                 // Second attempt with new token
-                response = await fetch(url, options);
+                response = await request(url, options);
             }
         } else {
             // Clear tokens and redirect if refresh failed
@@ -193,15 +240,19 @@ export const apiCall = async ({
         }
     }
     
-    const data = await response.json();
-    
+    const data = await parseJsonBody(response);
+
     if (!response.ok) {
         if (response.status === 401) {
             clearTokens();
             window.location.href = '/login';
         }
-        throw new Error(data.message || `Error: ${response.status}`);
+        throw new Error(data?.message || `Error: ${response.status}`);
     }
-    
+
+    if (data === null) {
+        throw new Error("Received an invalid response from the server.");
+    }
+
     return data;
 };
