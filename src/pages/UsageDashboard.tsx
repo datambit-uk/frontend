@@ -1,6 +1,7 @@
 
   import React, { useState, useEffect } from "react";
   import { BarChart3, Download, Users, Files, Clock, AlertCircle } from "lucide-react";
+  import { API_URL } from "../api/api";
 
   interface UsageStats {
     total_files: number;
@@ -22,9 +23,6 @@
     const [groupId, setGroupId] = useState<string>("");
     const [timeframe, setTimeframe] = useState<string>("30");
 
-    // Use base URL from environment or fallback to relative path
-    const API_URL = "https://production.datambit.com";
-
     useEffect(() => {
       fetchGroups();
     }, []);
@@ -36,7 +34,7 @@
     const fetchGroups = async () => {
       try {
         const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
-        const response = await fetch(`${API_URL}/api/v1/usage/groups`, {
+        const response = await fetch(`${API_URL}/usage/groups`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {
@@ -54,7 +52,7 @@
       try {
         const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
 
-        let url = `${API_URL}/api/v1/usage/stats`;
+        let url = `${API_URL}/usage/stats`;
         const params = new URLSearchParams();
         if (groupId) params.append('group_id', groupId);
         if (timeframe) params.append('timeframe', timeframe);
@@ -82,7 +80,7 @@
       try {
         const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
 
-        let url = `${API_URL}/api/v1/usage/report?format=${format}`;
+        let url = `${API_URL}/usage/report?format=${format}`;
         if (groupId) url += `&group_id=${groupId}`;
 
         const response = await fetch(url, {

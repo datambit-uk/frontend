@@ -91,7 +91,7 @@ const LoginPage: React.FC = () => {
 
     try {
       const response = await apiCall({
-        endpoint: "/api/v2/auth/register",
+        endpoint: "/auth/register",
         method: "POST",
         body: {
           "username": registerEmail,
@@ -124,7 +124,7 @@ const LoginPage: React.FC = () => {
 
     try {
       const response = await apiCall({
-        endpoint: "/api/v2/auth/login",
+        endpoint: "/auth/login",
         method: "POST",
         body: { "username": email, "password": password },
         auto_refresh: false
@@ -157,7 +157,7 @@ const LoginPage: React.FC = () => {
         if (token) {
           setIsLoading(true);
           const response = await apiCall({
-            endpoint: "/api/v2/auth/validate-token",
+            endpoint: "/auth/validate-token",
             method: "POST",
             jwtToken: true,
           });

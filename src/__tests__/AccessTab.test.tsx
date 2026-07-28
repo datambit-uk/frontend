@@ -26,7 +26,7 @@ test('generates an access code and shows it', async () => {
 
   expect(await screen.findByText('123456')).toBeInTheDocument();
   const post = mockedApiCall.mock.calls.find(
-    (c) => c[0].endpoint === '/api/v2/auth/save/generate-access-code'
+    (c) => c[0].endpoint === '/auth/save/generate-access-code'
   );
   expect(post[0].method).toBe('POST');
   expect(post[0].body).toEqual({ email: 'bob@acme.com', role: 4 });
@@ -52,7 +52,7 @@ test('updates a user role', async () => {
 
   await waitFor(() => {
     const post = mockedApiCall.mock.calls.find(
-      (c) => c[0].endpoint === '/api/v2/auth/update/user/role'
+      (c) => c[0].endpoint === '/auth/update/user/role'
     );
     expect(post).toBeTruthy();
     expect(post[0].method).toBe('POST');

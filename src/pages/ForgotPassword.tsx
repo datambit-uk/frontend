@@ -75,7 +75,7 @@ const PasswordReset: React.FC = () => {
     try {
         setIsLoading(true);
         const response = await apiCall({
-            endpoint: "/api/v2/auth/request/reset-password",
+            endpoint: "/auth/request/reset-password",
             method: "POST",
             body: { username: email },
         });
@@ -125,7 +125,7 @@ const PasswordReset: React.FC = () => {
         setIsLoading(true);
 
         await apiCall({
-            endpoint: "/api/v2/auth/update/reset-password",
+            endpoint: "/auth/update/reset-password",
             method: "POST",
             body: { username: email , password : password , access_code: otp},
         });

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Video, Copy, Check, X, AlertTriangle } from "lucide-react";
 import Dropbox from "../components/Dropbox";
 import { useMaintenance } from "../config/maintenance";
+import { API_URL } from "../api/api";
 
 interface UploadResponse {
   code: string;
@@ -30,7 +31,6 @@ const Home: React.FC = () => {
   });
   const [countdown, setCountdown] = useState(2);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
-  const API_URL = "https://production.datambit.com";
   // Redirect to report page after successful upload
   useEffect(() => {
     if (responseMessage.status === "success" && responseMessage.uploadId) {
@@ -211,7 +211,7 @@ const Home: React.FC = () => {
 
         resetNoProgressTimer();
 
-        let uploadUrl = `${API_URL}/api/v1/${group.type}/upload`;
+        let uploadUrl = `${API_URL}/upload/${group.type}/upload`;
 
         xhr.open("POST", uploadUrl, true);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);

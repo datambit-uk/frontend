@@ -37,7 +37,7 @@ test('selecting a group then assigning a template posts {template_id}', async ()
 
   await waitFor(() => {
     const post = mockedApiCall.mock.calls.find(
-      (c) => c[0].endpoint === '/api/v2/auth/groups/g1/template' && c[0].method === 'POST'
+      (c) => c[0].endpoint === '/auth/groups/g1/template' && c[0].method === 'POST'
     );
     expect(post).toBeTruthy();
     expect(post[0].body).toEqual({ template_id: 't1' });

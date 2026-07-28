@@ -37,7 +37,7 @@ const FeatureGateCheckbox: React.FC<FeatureGateCheckboxProps> = ({
       try {
         setLoading(true);
         const response = await apiCall({
-          endpoint: `/api/v2/auth/users/me/permissions/check`,
+          endpoint: `/auth/users/me/permissions/check`,
           method: 'GET',
           params: { feature: featureName },
           jwtToken: true

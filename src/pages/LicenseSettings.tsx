@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiCall } from '../api/api';
 import { AlertCircle, RefreshCw, Check, X } from 'lucide-react';
 
-// Shape returned by GET /api/v2/auth/users/me/license (inside response.message).
+// Shape returned by GET /auth/users/me/license (inside response.message).
 // Matches authentication-service PermissionController.get_user_license.
 interface LicenseResponse {
   license_id: string;
@@ -78,7 +78,7 @@ const LicenseSettings: React.FC = () => {
       setRefreshing(true);
       setError(null);
       const response = await apiCall({
-        endpoint: '/api/v2/auth/users/me/license',
+        endpoint: '/auth/users/me/license',
         method: 'GET',
         jwtToken: true,
       });

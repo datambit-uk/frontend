@@ -20,9 +20,9 @@ const UsersTab: React.FC = () => {
   const init = async () => {
     setLoading(true);
     try {
-      const usersRes = await apiCall({ endpoint: '/api/v2/auth/users', jwtToken: true });
+      const usersRes = await apiCall({ endpoint: '/auth/users', jwtToken: true });
       setUsers(usersRes.message ?? []);
-      const tplRes = await apiCall({ endpoint: '/api/v2/auth/templates', jwtToken: true });
+      const tplRes = await apiCall({ endpoint: '/auth/templates', jwtToken: true });
       setTemplates(tplRes.message?.templates ?? []);
       setError(null);
     } catch (err: any) {
@@ -39,9 +39,9 @@ const UsersTab: React.FC = () => {
     setChosenTemplate('');
     setReason('');
     try {
-      const scopeRes = await apiCall({ endpoint: `/api/v2/auth/users/${userId}/scope`, jwtToken: true });
+      const scopeRes = await apiCall({ endpoint: `/auth/users/${userId}/scope`, jwtToken: true });
       setScope(scopeRes.message ?? null);
-      const ovRes = await apiCall({ endpoint: `/api/v2/auth/users/${userId}/template-override`, jwtToken: true });
+      const ovRes = await apiCall({ endpoint: `/auth/users/${userId}/template-override`, jwtToken: true });
       setOverride(ovRes.message ?? null);
     } catch (err: any) {
       setError(err.message || 'Failed to load user detail');
@@ -63,7 +63,7 @@ const UsersTab: React.FC = () => {
     if (!chosenTemplate) return;
     try {
       await apiCall({
-        endpoint: `/api/v2/auth/users/${userId}/template-override`,
+        endpoint: `/auth/users/${userId}/template-override`,
         method: 'POST',
         body: { template_id: chosenTemplate, reason: reason || undefined },
         jwtToken: true,
@@ -76,7 +76,7 @@ const UsersTab: React.FC = () => {
 
   const clearOverrideForUser = async (userId: string) => {
     try {
-      await apiCall({ endpoint: `/api/v2/auth/users/${userId}/template-override`, method: 'DELETE', jwtToken: true });
+      await apiCall({ endpoint: `/auth/users/${userId}/template-override`, method: 'DELETE', jwtToken: true });
       loadDetail(userId);
     } catch (err: any) {
       setError(err.message || 'Failed to clear override');

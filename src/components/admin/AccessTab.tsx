@@ -25,7 +25,7 @@ const AccessTab: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await apiCall({ endpoint: '/api/v2/auth/users', jwtToken: true });
+      const res = await apiCall({ endpoint: '/auth/users', jwtToken: true });
       setUsers(res.message ?? []);
       setError(null);
     } catch (err: any) {
@@ -42,7 +42,7 @@ const AccessTab: React.FC = () => {
     setCopied(false);
     try {
       const res = await apiCall({
-        endpoint: '/api/v2/auth/save/generate-access-code',
+        endpoint: '/auth/save/generate-access-code',
         method: 'POST',
         body: { email: email.trim(), role },
         jwtToken: true,
@@ -78,7 +78,7 @@ const AccessTab: React.FC = () => {
     setSavingRole(true);
     try {
       await apiCall({
-        endpoint: '/api/v2/auth/update/user/role',
+        endpoint: '/auth/update/user/role',
         method: 'POST',
         body: { user_id: userId, role_id: chosenRole },
         jwtToken: true,

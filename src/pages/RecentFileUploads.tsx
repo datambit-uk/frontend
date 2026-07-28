@@ -55,7 +55,7 @@ const RecentFileUploads: React.FC = () => {
     try {
       // Using recent-uploads endpoint as get-all-uploads seems to be missing/deprecated
       const res: RecentUploadsResponse = await apiCall({
-        endpoint: `/api/v2/report/recent-uploads`,
+        endpoint: `/reports/recent-uploads`,
         params: { page: String(pageNum), per_page: String(perPage) },
         jwtToken: true,
       });

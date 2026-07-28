@@ -108,7 +108,7 @@ const Report: React.FC = () => {
         ...(contentType && { content_type: contentType }),
       });
 
-      const url = `/api/v2/report/recent-uploads?${queryParams.toString()}`;
+      const url = `/reports/recent-uploads?${queryParams.toString()}`;
 
       
       const result: ReportResponse = await apiCall({

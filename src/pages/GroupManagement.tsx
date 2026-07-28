@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Users, UserPlus, Trash2, Edit, ChevronRight, Shield, ShieldAlert, PlusCircle, ArrowLeft } from "lucide-react";
+import { API_URL } from "../api/api";
 
 interface Group {
   id: string;
@@ -30,8 +31,6 @@ const GroupManagement: React.FC = () => {
   const [newMemberId, setNewMemberId] = useState("");
   const [isNewMemberAdmin, setIsNewMemberAdmin] = useState(false);
 
-  const API_URL = "https://production.datambit.com";
-
   useEffect(() => {
     fetchGroups();
   }, []);
@@ -44,7 +43,7 @@ const GroupManagement: React.FC = () => {
   const fetchGroups = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups`, {
+      const response = await fetch(`${API_URL}/usage/groups`, {
         headers: getAuthHeader()
       });
       if (!response.ok) throw new Error("Failed to fetch groups");
@@ -60,7 +59,7 @@ const GroupManagement: React.FC = () => {
 
   const fetchMembers = async (groupId: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups/${groupId}/members`, {
+      const response = await fetch(`${API_URL}/usage/groups/${groupId}/members`, {
         headers: getAuthHeader()
       });
       if (!response.ok) throw new Error("Failed to fetch members");
@@ -74,7 +73,7 @@ const GroupManagement: React.FC = () => {
   const handleCreateGroup = async () => {
     if (!newGroupName) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups`, {
+      const response = await fetch(`${API_URL}/usage/groups`, {
         method: 'POST',
         headers: getAuthHeader(),
         body: JSON.stringify({ name: newGroupName })
@@ -92,7 +91,7 @@ const GroupManagement: React.FC = () => {
   const handleUpdateGroup = async () => {
     if (!editingGroup || !editGroupName) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups/${editingGroup.id}`, {
+      const response = await fetch(`${API_URL}/usage/groups/${editingGroup.id}`, {
         method: 'PUT',
         headers: getAuthHeader(),
         body: JSON.stringify({ name: editGroupName })
@@ -111,7 +110,7 @@ const GroupManagement: React.FC = () => {
   const handleDeleteGroup = async (groupId: string) => {
     if (!window.confirm("Are you sure you want to delete this group? This action cannot be undone.")) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups/${groupId}`, {
+      const response = await fetch(`${API_URL}/usage/groups/${groupId}`, {
         method: 'DELETE',
         headers: getAuthHeader()
       });
@@ -127,7 +126,7 @@ const GroupManagement: React.FC = () => {
   const handleAddMember = async () => {
     if (!selectedGroup || !newMemberId) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups/${selectedGroup.id}/members`, {
+      const response = await fetch(`${API_URL}/usage/groups/${selectedGroup.id}/members`, {
         method: 'POST',
         headers: getAuthHeader(),
         body: JSON.stringify({ user_id: newMemberId, is_admin: isNewMemberAdmin })
@@ -146,7 +145,7 @@ const GroupManagement: React.FC = () => {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedGroup) return;
     try {
-      const response = await fetch(`${API_URL}/api/v1/usage/groups/${selectedGroup.id}/members/${userId}`, {
+      const response = await fetch(`${API_URL}/usage/groups/${selectedGroup.id}/members/${userId}`, {
         method: 'DELETE',
         headers: getAuthHeader()
       });

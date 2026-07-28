@@ -1,5 +1,5 @@
 // Maintenance mode — backend-backed global setting.
-// Source of truth: GET /api/v2/auth/maintenance (public).
+// Source of truth: GET /auth/maintenance (public).
 import { useEffect, useState, useCallback } from 'react';
 import { apiCall } from '../api/api';
 
@@ -12,7 +12,7 @@ const FALLBACK_MESSAGE =
   'Uploads are temporarily disabled while we perform a system update. Please try again in a few minutes.';
 
 export async function fetchMaintenance(): Promise<MaintenanceState> {
-  const res = await apiCall({ endpoint: '/api/v2/auth/maintenance' });
+  const res = await apiCall({ endpoint: '/auth/maintenance' });
   return {
     uploadsDisabled: Boolean(res.uploads_disabled),
     message: res.message || FALLBACK_MESSAGE,

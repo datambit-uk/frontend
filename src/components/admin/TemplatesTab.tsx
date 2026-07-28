@@ -52,7 +52,7 @@ const TemplatesTab: React.FC = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const res = await apiCall({ endpoint: '/api/v2/auth/templates', jwtToken: true });
+      const res = await apiCall({ endpoint: '/auth/templates', jwtToken: true });
       setTemplates(res.message?.templates ?? []);
       setError(null);
     } catch (err: any) {
@@ -66,7 +66,7 @@ const TemplatesTab: React.FC = () => {
 
   const openEdit = async (id: string) => {
     try {
-      const res = await apiCall({ endpoint: `/api/v2/auth/templates/${id}`, jwtToken: true });
+      const res = await apiCall({ endpoint: `/auth/templates/${id}`, jwtToken: true });
       const t: TemplateDetail = res.message;
       setForm({
         name: t.name, description: t.description,
@@ -103,9 +103,9 @@ const TemplatesTab: React.FC = () => {
     };
     try {
       if (editingId) {
-        await apiCall({ endpoint: `/api/v2/auth/templates/${editingId}`, method: 'PUT', body: payload, jwtToken: true });
+        await apiCall({ endpoint: `/auth/templates/${editingId}`, method: 'PUT', body: payload, jwtToken: true });
       } else {
-        await apiCall({ endpoint: '/api/v2/auth/templates', method: 'POST', body: payload, jwtToken: true });
+        await apiCall({ endpoint: '/auth/templates', method: 'POST', body: payload, jwtToken: true });
       }
       setShowModal(false);
       fetchTemplates();
@@ -117,7 +117,7 @@ const TemplatesTab: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this template?')) return;
     try {
-      await apiCall({ endpoint: `/api/v2/auth/templates/${id}`, method: 'DELETE', jwtToken: true });
+      await apiCall({ endpoint: `/auth/templates/${id}`, method: 'DELETE', jwtToken: true });
       fetchTemplates();
     } catch (err: any) {
       setError(err.message || 'Failed to delete template');

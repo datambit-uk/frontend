@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image as Loader2, AlertCircle, Check, PlusCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supportService, SupportTicket } from '../services/supportService';
+import { API_URL } from '../api/api';
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -147,7 +148,7 @@ const SupportPage: React.FC = () => {
         return;
       }
       
-      xhr.open('POST', 'https://production.datambit.com/api/v2/auth/support', true);
+      xhr.open('POST', `${API_URL}/auth/support`, true);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
     });

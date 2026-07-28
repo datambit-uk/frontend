@@ -36,7 +36,7 @@ test('lists users and clears an override', async () => {
 
   await waitFor(() => {
     const del = mockedApiCall.mock.calls.find(
-      (c) => c[0].endpoint === '/api/v2/auth/users/u1/template-override' && c[0].method === 'DELETE'
+      (c) => c[0].endpoint === '/auth/users/u1/template-override' && c[0].method === 'DELETE'
     );
     expect(del).toBeTruthy();
   });

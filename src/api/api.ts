@@ -82,7 +82,7 @@ const refreshAuthToken = async (): Promise<boolean> => {
     }
     
     try {
-        const response = await fetch(`${API_URL}/api/v2/auth/refresh`, {
+        const response = await fetch(`${API_URL}/auth/refresh`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

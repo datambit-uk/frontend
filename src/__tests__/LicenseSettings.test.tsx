@@ -15,7 +15,7 @@ jest.mock('lucide-react', () => ({
 }));
 
 // Fixture matches the real backend contract:
-// GET /api/v2/auth/users/me/license -> { code, message: <this> }
+// GET /auth/users/me/license -> { code, message: <this> }
 // (authentication-service PermissionController.get_user_license)
 const mockLicenseData = {
   license_id: 'sub_acme_001',
@@ -104,7 +104,7 @@ describe('LicenseSettings Component', () => {
       });
 
       expect(apiModule.apiCall).toHaveBeenCalledWith({
-        endpoint: '/api/v2/auth/users/me/license',
+        endpoint: '/auth/users/me/license',
         method: 'GET',
         jwtToken: true,
       });

@@ -34,7 +34,7 @@ test('lists templates then creates one with flags + quotas', async () => {
 
   await waitFor(() => {
     const postCall = mockedApiCall.mock.calls.find(
-      (c) => c[0].endpoint === '/api/v2/auth/templates' && c[0].method === 'POST'
+      (c) => c[0].endpoint === '/auth/templates' && c[0].method === 'POST'
     );
     expect(postCall).toBeTruthy();
     expect(postCall[0].body).toMatchObject({

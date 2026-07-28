@@ -29,7 +29,7 @@ const GroupsTab: React.FC = () => {
   const fetchGroups = async () => {
     setLoading(true);
     try {
-      const data = await apiCall({ endpoint: '/api/v1/usage/groups', jwtToken: true });
+      const data = await apiCall({ endpoint: '/usage/groups', jwtToken: true });
       setGroups(data);
     } catch (err: any) {
       setError('Failed to load groups. Access denied or server error.');
@@ -40,7 +40,7 @@ const GroupsTab: React.FC = () => {
 
   const fetchTemplates = async () => {
     try {
-      const res = await apiCall({ endpoint: '/api/v2/auth/templates', jwtToken: true });
+      const res = await apiCall({ endpoint: '/auth/templates', jwtToken: true });
       setTemplates(res.message?.templates ?? []);
     } catch {
       // non-fatal: assign dropdown just stays empty
@@ -49,7 +49,7 @@ const GroupsTab: React.FC = () => {
 
   const fetchMembers = async (groupId: string) => {
     try {
-      const data = await apiCall({ endpoint: `/api/v1/usage/groups/${groupId}/members`, jwtToken: true });
+      const data = await apiCall({ endpoint: `/usage/groups/${groupId}/members`, jwtToken: true });
       setMembers(data);
     } catch (err) {
       setMembers([]);
@@ -58,7 +58,7 @@ const GroupsTab: React.FC = () => {
 
   const fetchGroupTemplate = async (groupId: string) => {
     try {
-      const res = await apiCall({ endpoint: `/api/v2/auth/groups/${groupId}/template`, jwtToken: true });
+      const res = await apiCall({ endpoint: `/auth/groups/${groupId}/template`, jwtToken: true });
       setGroupTemplate(res.message ?? null);
     } catch {
       setGroupTemplate(null);
@@ -68,7 +68,7 @@ const GroupsTab: React.FC = () => {
   const handleCreateGroup = async () => {
     if (!newGroupName) return;
     try {
-      await apiCall({ endpoint: '/api/v1/usage/groups', method: 'POST', body: { name: newGroupName }, jwtToken: true });
+      await apiCall({ endpoint: '/usage/groups', method: 'POST', body: { name: newGroupName }, jwtToken: true });
       setNewGroupName('');
       setShowCreateModal(false);
       fetchGroups();
@@ -80,7 +80,7 @@ const GroupsTab: React.FC = () => {
   const handleUpdateGroup = async () => {
     if (!editingGroup || !editGroupName) return;
     try {
-      await apiCall({ endpoint: `/api/v1/usage/groups/${editingGroup.id}`, method: 'PUT', body: { name: editGroupName }, jwtToken: true });
+      await apiCall({ endpoint: `/usage/groups/${editingGroup.id}`, method: 'PUT', body: { name: editGroupName }, jwtToken: true });
       setEditingGroup(null);
       setEditGroupName('');
       setShowEditModal(false);
@@ -93,7 +93,7 @@ const GroupsTab: React.FC = () => {
   const handleDeleteGroup = async (groupId: string) => {
     if (!window.confirm('Delete this group? This cannot be undone.')) return;
     try {
-      await apiCall({ endpoint: `/api/v1/usage/groups/${groupId}`, method: 'DELETE', jwtToken: true });
+      await apiCall({ endpoint: `/usage/groups/${groupId}`, method: 'DELETE', jwtToken: true });
       if (selectedGroup?.id === groupId) setSelectedGroup(null);
       fetchGroups();
     } catch (err: any) {
@@ -104,7 +104,7 @@ const GroupsTab: React.FC = () => {
   const handleAddMember = async () => {
     if (!selectedGroup || !newMemberId) return;
     try {
-      await apiCall({ endpoint: `/api/v1/usage/groups/${selectedGroup.id}/members`, method: 'POST', body: { user_id: newMemberId, is_admin: isNewMemberAdmin }, jwtToken: true });
+      await apiCall({ endpoint: `/usage/groups/${selectedGroup.id}/members`, method: 'POST', body: { user_id: newMemberId, is_admin: isNewMemberAdmin }, jwtToken: true });
       setNewMemberId('');
       setIsNewMemberAdmin(false);
       setShowAddMemberModal(false);
@@ -117,7 +117,7 @@ const GroupsTab: React.FC = () => {
   const handleRemoveMember = async (userId: string) => {
     if (!selectedGroup) return;
     try {
-      await apiCall({ endpoint: `/api/v1/usage/groups/${selectedGroup.id}/members/${userId}`, method: 'DELETE', jwtToken: true });
+      await apiCall({ endpoint: `/usage/groups/${selectedGroup.id}/members/${userId}`, method: 'DELETE', jwtToken: true });
       fetchMembers(selectedGroup.id);
     } catch (err: any) {
       setError(err.message || 'Failed to remove member');
@@ -127,7 +127,7 @@ const GroupsTab: React.FC = () => {
   const handleAssignTemplate = async () => {
     if (!selectedGroup || !assignTemplateId) return;
     try {
-      const res = await apiCall({ endpoint: `/api/v2/auth/groups/${selectedGroup.id}/template`, method: 'POST', body: { template_id: assignTemplateId }, jwtToken: true });
+      const res = await apiCall({ endpoint: `/auth/groups/${selectedGroup.id}/template`, method: 'POST', body: { template_id: assignTemplateId }, jwtToken: true });
       const count = res.message?.recomputed_users ?? 0;
       setError(null);
       window.alert(`Template assigned. Recomputed ${count} user(s).`);

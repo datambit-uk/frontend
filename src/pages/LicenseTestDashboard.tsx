@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Shield, Upload, Play, History, CheckCircle, XCircle, Clock, Smartphone, Database, AlertCircle, RefreshCw } from "lucide-react";
+import { API_URL } from "../api/api";
 
 interface PhoneHomeResponse {
   valid: boolean;
@@ -34,9 +35,10 @@ const LicenseTestDashboard: React.FC = () => {
   const [lastResponse, setLastResponse] = useState<PhoneHomeResponse | null>(null);
   const [history, setHistory] = useState<CallLogEntry[]>([]);
 
-  // Fixed path: prefix is /api/v1/usage, not /api/v1/licensing
-  const API_URL = "https://production.datambit.com";
-  const ENDPOINT_PREFIX = "/api/v1/usage";
+  // Licensing is served by usage-tracking-service, so the public prefix is
+  // /usage (rewritten to /api/v1/usage at the Gateway) — there is no
+  // licensing service of its own.
+  const ENDPOINT_PREFIX = "/usage";
 
   const fetchLicenses = async () => {
     try {

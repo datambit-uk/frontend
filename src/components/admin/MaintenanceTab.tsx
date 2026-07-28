@@ -15,7 +15,7 @@ const MaintenanceTab: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await apiCall({ endpoint: '/api/v2/auth/maintenance', jwtToken: true });
+      const res = await apiCall({ endpoint: '/auth/maintenance', jwtToken: true });
       setUploadsDisabled(Boolean(res.uploads_disabled));
       setMessage(res.message ?? '');
       setError(null);
@@ -31,7 +31,7 @@ const MaintenanceTab: React.FC = () => {
     setSaved(false);
     try {
       await apiCall({
-        endpoint: '/api/v2/auth/maintenance',
+        endpoint: '/auth/maintenance',
         method: 'PUT',
         body: { uploads_disabled: uploadsDisabled, message },
         jwtToken: true,

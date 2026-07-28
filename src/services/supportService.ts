@@ -1,4 +1,6 @@
-const API_BASE = 'https://production.datambit.com/api/v2/auth';
+import { API_URL } from '../api/api';
+
+const API_BASE = `${API_URL}/auth`;
 
 export interface TicketFile {
   attachment_id?: string;

@@ -139,7 +139,7 @@ const AccessRequest: React.FC = () => {
     try {
       setIsLoading(true);
       const response = await apiCall({
-        endpoint: "/api/v2/auth/access-request",
+        endpoint: "/auth/access-request",
         method: "POST",
         body: formData,
       });

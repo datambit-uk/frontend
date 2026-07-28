@@ -24,7 +24,7 @@ describe('MaintenanceTab', () => {
     await waitFor(() =>
       expect(mockedApiCall).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          endpoint: '/api/v2/auth/maintenance',
+          endpoint: '/auth/maintenance',
           method: 'PUT',
           jwtToken: true,
           body: expect.objectContaining({ uploads_disabled: true, message: 'Hi' }),
