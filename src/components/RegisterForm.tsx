@@ -94,8 +94,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
               setAccessCode(value);
             }
           }}
-          pattern="[A-Za-z0-9]{6}"
-          title="Please enter exactly 6 alphanumeric characters"
+          pattern="[A-Za-z0-9]{10}"
+          title="Please enter exactly 10 alphanumeric characters"
         />
       </motion.div>
 
