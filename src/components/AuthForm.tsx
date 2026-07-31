@@ -351,11 +351,11 @@ const AuthForm: React.FC<AuthFormProps> = ({
       maxLength={10}
       required
       className="block w-full px-3 py-2 border border-gray-700 bg-gray-800/50 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500"
-      placeholder="Enter 6-character code (letters & numbers)"
+      placeholder="Enter 10-character code (letters & numbers)"
       value={accessCode}
       onChange={(e) => {
         const value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        if (value.length <= 11) setAccessCode(value);
+        if (value.length <= 10) setAccessCode(value);
       }}
       pattern="[A-Za-z0-9]{10}"
       title="Please enter exactly 10 alphanumeric characters"
