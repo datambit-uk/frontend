@@ -320,7 +320,7 @@ const PasswordReset: React.FC = () => {
                   className="block w-full px-3 py-2 border border-gray-700 bg-gray-800/50 text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-500"
                   placeholder="Enter the OTP from your email"
                   value={otp}
-                  maxLength={6}
+                  maxLength={10}
                   onChange={(e) => setOtp(e.target.value)}
                   disabled={isLoading}
                 />
