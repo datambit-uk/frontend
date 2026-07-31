@@ -1,4 +1,4 @@
-import { apiCall, ApiNetworkError } from '../api/api';
+import { apiCall, ApiNetworkError, loginUrl } from '../api/api';
 
 // Minimal Response stand-in — apiCall only touches ok/status/json.
 const mockResponse = (
@@ -17,6 +17,37 @@ const nonJsonResponse = (status: number) =>
       throw new SyntaxError("Unexpected token '<', \"<html>\" is not valid JSON");
     },
   });
+
+// Regression tests for the GitHub Pages login redirect: the app is served from
+// the /frontend/ sub-path behind a HashRouter, so the session-expiry redirect
+// must land on /frontend/#/login. Assigning a bare '/login' resolved against the
+// origin root and served a 404, locking users out of the app entirely.
+describe('loginUrl', () => {
+  it('preserves the deployment sub-path and the hash route', () => {
+    expect(loginUrl('/frontend/')).toBe('/frontend/#/login');
+  });
+
+  it('resolves to the hash route at the dev-server root', () => {
+    expect(loginUrl('/')).toBe('/#/login');
+  });
+
+  it('handles a base path served without its trailing slash', () => {
+    expect(loginUrl('/frontend')).toBe('/frontend/#/login');
+  });
+
+  it('keeps the sub-path when index.html is named explicitly', () => {
+    expect(loginUrl('/frontend/index.html')).toBe('/frontend/index.html#/login');
+  });
+
+  it('never produces a root-absolute path that bypasses the hash router', () => {
+    expect(loginUrl('/frontend/')).not.toBe('/login');
+  });
+
+  it('defaults to the current document path', () => {
+    // jsdom serves the suite from http://localhost/
+    expect(loginUrl()).toBe('/#/login');
+  });
+});
 
 describe('apiCall', () => {
   beforeEach(() => {

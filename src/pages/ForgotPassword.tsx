@@ -5,6 +5,26 @@ import { apiCall } from "../api/api";
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+interface ApiResult {
+  code?: string;
+  message?: unknown;
+}
+
+const getApiMessage = (message: unknown, fallback: string) => {
+  if (typeof message === "string" && message.trim().length > 0) {
+    return message;
+  }
+
+  if (message && typeof message === "object") {
+    const detail = (message as Record<string, unknown>).detail;
+    if (typeof detail === "string" && detail.trim().length > 0) {
+      return detail;
+    }
+  }
+
+  return fallback;
+};
+
 const PasswordReset: React.FC = () => {
   // Form states
   const [email, setEmail] = useState("");
@@ -78,16 +98,21 @@ const PasswordReset: React.FC = () => {
             endpoint: "/auth/request/reset-password",
             method: "POST",
             body: { username: email },
-        });
-        console.log(response);
+        }) as ApiResult;
+
+        if (response?.code && response.code !== "success") {
+          throw new Error(getApiMessage(response.message, "Failed to send OTP. Please try again."));
+        }
+
         setSuccess("OTP has been sent to your email address");
         setStep(2);
     } catch (err: any) {
-        if(err.message.includes("user doesnt exist")){
+        const apiMessage = err instanceof Error ? err.message : "";
+
+        if (apiMessage.toLowerCase().includes("user doesnt exist") || apiMessage.toLowerCase().includes("user doesn't exist")) {
             setError("Cannot find the user with given Email Id");
-        }
-        else{ 
-            setError("Failed to send OTP. Please try again.");
+        } else {
+            setError(apiMessage || "Failed to send OTP. Please try again.");
         }
     } finally {
         setIsLoading(false);
@@ -124,11 +149,15 @@ const PasswordReset: React.FC = () => {
     try {
         setIsLoading(true);
 
-        await apiCall({
+        const response = await apiCall({
             endpoint: "/auth/update/reset-password",
             method: "POST",
             body: { username: email , password : password , access_code: otp},
-        });
+        }) as ApiResult;
+
+        if (response?.code && response.code !== "success") {
+          throw new Error(getApiMessage(response.message, "Failed to reset password. Please verify your OTP and try again."));
+        }
       
         setSuccess("Password has been reset successfully! You can now login with your new password.");
 
@@ -137,7 +166,8 @@ const PasswordReset: React.FC = () => {
         }, 3000);
 
     } catch (err: any) {
-      setError("Failed to reset password. Please verify your OTP and try again.");
+      const apiMessage = err instanceof Error ? err.message : "";
+      setError(apiMessage || "Failed to reset password. Please verify your OTP and try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -426,13 +456,14 @@ const PasswordReset: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-400">
               Remember your password?{" "}
-              <motion.a
+              <motion.button
                 whileHover={{ scale: 1.05 }}
-                href="/login"
+                type="button"
+                onClick={() => navigate("/login")}
                 className="font-medium text-blue-400 hover:text-blue-300"
               >
                 Sign in
-              </motion.a>
+              </motion.button>
             </p>
           </div>
         </motion.div>

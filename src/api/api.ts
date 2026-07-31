@@ -42,6 +42,23 @@ const parseJsonBody = async (response: Response) => {
     }
 };
 
+/**
+ * Absolute-path URL of the login screen, for the hard redirects below.
+ *
+ * The app is served from a sub-path on GitHub Pages (/frontend/) behind a
+ * HashRouter, so the login screen lives at `<base>#/login`. A bare '/login'
+ * resolves against the origin root and 404s. `window.location.pathname` is the
+ * base: a HashRouter never changes it after the document loads. It is read at
+ * call time rather than from `import.meta.env.BASE_URL` so this module stays
+ * loadable under ts-jest's CommonJS transform.
+ */
+export const loginUrl = (pathname: string = window.location.pathname): string =>
+    `${pathname.endsWith('/') || pathname.includes('.') ? pathname : `${pathname}/`}#/login`;
+
+const redirectToLogin = () => {
+    window.location.href = loginUrl();
+};
+
 export interface ApiCallParams {
     endpoint: string;
     method?: string;
@@ -185,7 +202,7 @@ export const apiCall = async ({
     if (jwtToken) {
         let token = getJwtToken();
         if (token === null) {
-            window.location.href = '/login';
+            redirectToLogin();
             throw new Error("Token missing");
         }
 
@@ -195,7 +212,7 @@ export const apiCall = async ({
                 token = getJwtToken();
             } else {
                 clearTokens();
-                window.location.href = '/login';
+                redirectToLogin();
                 throw new Error("Session expired. Redirecting to login page.");
             }
         }
@@ -235,7 +252,7 @@ export const apiCall = async ({
         } else {
             // Clear tokens and redirect if refresh failed
             clearTokens();
-            window.location.href = '/login';
+            redirectToLogin();
             throw new Error("Authentication failed. Redirecting to login page.");
         }
     }
@@ -245,7 +262,7 @@ export const apiCall = async ({
     if (!response.ok) {
         if (response.status === 401) {
             clearTokens();
-            window.location.href = '/login';
+            redirectToLogin();
         }
         throw new Error(data?.message || `Error: ${response.status}`);
     }
