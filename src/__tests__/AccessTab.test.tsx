@@ -6,25 +6,23 @@ import * as apiModule from '../api/api';
 jest.mock('../api/api');
 jest.mock('lucide-react', () => ({
   AlertCircle: () => <svg />, ChevronDown: () => <svg />, ChevronRight: () => <svg />,
-  KeyRound: () => <svg />, Copy: () => <svg />, Check: () => <svg />,
+  KeyRound: () => <svg />,
 }));
 
 const mockedApiCall = apiModule.apiCall as jest.Mock;
 beforeEach(() => { mockedApiCall.mockReset(); });
 
-test('generates an access code and shows it', async () => {
+test('generates an access code and shows confirmation', async () => {
   mockedApiCall.mockResolvedValueOnce({ code: 'success', message: [] }); // GET users
   render(<AccessTab />);
   await waitFor(() => expect(mockedApiCall).toHaveBeenCalled());
 
-  mockedApiCall.mockResolvedValueOnce({
-    code: 'success',
-    message: { email: 'bob@acme.com', access_code: '123456' },
-  });
+  mockedApiCall.mockResolvedValueOnce({ code: 'success', message: {} });
   fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'bob@acme.com' } });
   fireEvent.click(screen.getByRole('button', { name: /generate/i }));
 
-  expect(await screen.findByText('123456')).toBeInTheDocument();
+  expect(await screen.findByText(/access code for bob@acme.com/i)).toBeInTheDocument();
+  expect(screen.getByText(/valid for 72 hours/i)).toBeInTheDocument();
   const post = mockedApiCall.mock.calls.find(
     (c) => c[0].endpoint === '/auth/save/generate-access-code'
   );
