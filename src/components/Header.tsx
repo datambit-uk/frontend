@@ -73,8 +73,8 @@ const Header: React.FC<HeaderProps> = ({ onSidebarToggle }) => {
         </button>
 
         {/* Logo - Only visible on mobile */}
-        <div className="md:hidden">
-          <img 
+        <div className="md:hidden inline-block">
+          <img
             src={import.meta.env.BASE_URL + 'datambit_logo.png'}
             alt="Datambit Logo"
             className="h-8 w-auto"

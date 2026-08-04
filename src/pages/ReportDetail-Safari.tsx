@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
+import {
+  collectHeatmapUrls,
+  downloadHeatmapFiles,
+  isHeatmapVideoUrl,
+  normalizeHeatmapUrl,
+} from '../utils/heatmapExport';
 
 interface FileMetadata {
   content_type: string;
@@ -21,6 +27,7 @@ interface VideoAnalysis {
   faces_detected?: number;
   frames_analyzed?: number;
   class_confidences?: Record<string, number>;
+  class_scores?: Record<string, number>;
   predicted_class_idx?: number;
   score_video?: number;
   num_windows?: number;
@@ -240,6 +247,32 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
             <p>Faces Detected: <span className="text-gray-300">{v.faces_detected}</span></p>
           )}
         </div>
+
+        {/* Class Scores (class_scores from detector; class_confidences is legacy) */}
+        {(v.class_scores || v.class_confidences) && (
+          <div className="mt-2">
+            <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Scores</p>
+            <div className="space-y-1 text-[10px]">
+              {Object.entries(v.class_scores || v.class_confidences || {}).map(([className, score]: [string, any]) => {
+                const value = Number(score);
+                return (
+                  <div key={className} className="flex justify-between items-center bg-black/20 p-1.5 rounded">
+                    <span className="text-gray-400">{formatClassName(className)}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-gray-800 h-1 rounded overflow-hidden">
+                        <div
+                          className={className.toLowerCase() === 'real' ? 'bg-green-500 h-full' : 'bg-red-500 h-full'}
+                          style={{ width: `${Math.min(100, value * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-gray-300 w-12 text-right">{value.toFixed(3)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {heatmapUrls && heatmapUrls.length > 0 && (
@@ -255,32 +288,6 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
           transition={forceExpand ? { duration: 0 } : { duration: 0.3 }}
           className="mt-4 space-y-4 pt-3 border-t border-gray-700/50"
         >
-          {/* Class Confidences */}
-          {v.class_confidences && (
-            <div>
-              <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Score</p>
-              <div className="space-y-1 text-[10px]">
-                {Object.entries(v.class_confidences).map(([className, score]: [string, any]) => {
-                  const pct = Number(score) * 100;
-                  return (
-                    <div key={className} className="flex justify-between items-center bg-black/20 p-1.5 rounded">
-                      <span className="text-gray-400">{formatClassName(className)}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-800 h-1 rounded overflow-hidden">
-                          <div 
-                            className={className.toLowerCase() === 'real' ? 'bg-green-500 h-full' : 'bg-red-500 h-full'}
-                            style={{ width: `${Math.min(100, pct)}%` }}
-                          />
-                        </div>
-                        <span className="text-gray-300 w-12 text-right">{pct.toFixed(1)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Performance Details */}
           {v.performance && (
             <div className="bg-black/20 p-2 rounded">
@@ -761,36 +768,45 @@ const SuspiciousChunksTimeline: React.FC<{
 };
 
 const HeatmapSection: React.FC<{ urls: string[] | null }> = ({ urls }) => {
-  if (!urls || urls.length === 0) return null;
+  const safeUrls = Array.isArray(urls)
+    ? urls.filter((u): u is string => typeof u === "string" && u.trim().length > 0)
+    : [];
+  if (safeUrls.length === 0) return null;
 
   return (
     <div className="mt-3">
     <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Video Heatmaps</h4>
     <div className="flex flex-col gap-4">
-    {urls.map((url, i) => {
-      // If it's base64, render directly; if it's a URL, link to it
-      const isBase64 = url.startsWith('data:');
-      const isUrl = url.startsWith('http');
-
+    {safeUrls.map((url, i) => {
+      const normalizedUrl = normalizeHeatmapUrl(url);
+      const isVideo = isHeatmapVideoUrl(normalizedUrl);
+      const canRenderMedia =
+        normalizedUrl.startsWith("data:") ||
+        normalizedUrl.startsWith("http://") ||
+        normalizedUrl.startsWith("https://") ||
+        (normalizedUrl.startsWith("/") && !normalizedUrl.startsWith("//"));
       return (
         <div key={i} className="relative group bg-black/50 rounded-lg overflow-hidden border border-gray-700/50 hover:border-orange-400/50 transition-all w-full">
-        {isBase64 && (
+        {canRenderMedia && isVideo && (
+          <video
+          src={normalizedUrl}
+          className="w-full h-auto block"
+          controls
+          muted
+          playsInline
+          preload="metadata"
+          />
+        )}
+        {canRenderMedia && !isVideo && (
           <img
-          src={url}
+          src={normalizedUrl}
           alt={`Heatmap ${i + 1}`}
           className="w-full h-auto block"
           />
         )}
-        {isUrl && (
-          <img
-          src={url}
-          alt={`Heatmap ${i + 1}`}
-          className="w-full h-auto block"
-          />
-        )}
-        {!isBase64 && !isUrl && (
+        {!canRenderMedia && (
           <div className="w-full aspect-video flex items-center justify-center text-gray-500 text-xs text-center p-2">
-          <span>{url.substring(0, 20)}...</span>
+          <span>Unable to preview heatmap</span>
           </div>
         )}
         </div>
@@ -817,7 +833,11 @@ const ReportDetail: React.FC = () => {
     navigate(-1);
   };
 
-  const handleExportPDF = () => {
+  const handleExport = async () => {
+    const heatmapUrls = collectHeatmapUrls(data);
+    if (heatmapUrls.length > 0) {
+      await downloadHeatmapFiles(heatmapUrls);
+    }
     setIsPrinting(true);
     // Give time for state to update and layout to expand
     setTimeout(() => {
@@ -880,7 +900,10 @@ const ReportDetail: React.FC = () => {
             return !!(
               upload.result?.audio_analysis ||
               upload.result?.image_result ||
-              upload.result?.video_analysis
+              upload.result?.video_analysis ||
+              (upload.result?.heatmap_paths && upload.result.heatmap_paths.length > 0) ||
+              (upload.result?.heatmap_url && upload.result.heatmap_url.length > 0) ||
+              upload.result?.verdict
             );
 
           }
@@ -1039,18 +1062,12 @@ const ReportDetail: React.FC = () => {
 
         // Resilient field extraction with fallbacks for new structure
         const verdict = a.verdict || a.final_audio_verdict || 'UNKNOWN';
+        // File-level fused confidences from the detector — do not average windows here.
         const fakeConf = a.fake_confidence ?? a.final_audio_fake_confidence ?? 0;
         const realConf = a.real_confidence ?? a.final_audio_real_confidence ?? 0;
         const procTime = a.processing_time ?? a.audio_prediction_raw?.processing_time ?? 0;
         const avgInf = a.avg_inference_ms ?? a.audio_prediction_raw?.avg_inference_ms ?? 0;
         const duration = a.duration ?? a.audio_prediction_raw?.duration ?? 0;
-
-        const avgFakeConfidence = a.audio_windows && a.audio_windows.length > 0
-          ? a.audio_windows.reduce((sum, w) => sum + w.fake_confidence, 0) / a.audio_windows.length
-          : fakeConf;
-        const avgRealConfidence = a.audio_windows && a.audio_windows.length > 0
-          ? a.audio_windows.reduce((sum, w) => sum + w.real_confidence, 0) / a.audio_windows.length
-          : realConf;
 
         const isNoSpeech = verdict === 'ERROR' && typeof a.error === 'string' && a.error.includes('No speech detected');
 
@@ -1079,8 +1096,8 @@ const ReportDetail: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <p>Fake Confidence: <span className="text-red-300">{(avgFakeConfidence * 100).toFixed(2)}%</span></p>
-                    <p>Real Confidence: <span className="text-green-300">{(avgRealConfidence * 100).toFixed(2)}%</span></p>
+                    <p>Fake Confidence: <span className="text-red-300">{(Number(fakeConf) * 100).toFixed(2)}%</span></p>
+                    <p>Real Confidence: <span className="text-green-300">{(Number(realConf) * 100).toFixed(2)}%</span></p>
                     <p>Processing Time: <span className="text-gray-300">{procTime > 0 ? procTime.toFixed(2) : 'N/A'}s</span></p>
                     {avgInf > 0 && (
                       <p>Avg Inference: <span className="text-gray-300">{avgInf.toFixed(2)} ms</span></p>
@@ -1088,11 +1105,13 @@ const ReportDetail: React.FC = () => {
                     {duration > 0 && (
                       <p>Audio Duration: <span className="text-gray-300">{duration.toFixed(2)}s</span></p>
                     )}
+                    {/* Predicted language hidden from report UI
                     {(a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name) && (
                       <p>Primary Language: <span className="text-blue-300 font-medium capitalize">{a.language_predicted_name || a.audio_prediction_raw?.language_predicted_name}</span>
                       {(a.language_confidence || a.audio_prediction_raw?.language_confidence) && <span className="opacity-60 ml-1">(Conf: {((a.language_confidence || a.audio_prediction_raw?.language_confidence) * 100).toFixed(1)}%)</span>}
                       </p>
                     )}
+                    */}
                     {a.error && (
                       <p className="text-red-400 mt-1">Error: {a.error}</p>
                     )}
@@ -1224,12 +1243,12 @@ const ReportDetail: React.FC = () => {
       <div className="flex flex-row items-center gap-2 min-w-[160px] flex-1 justify-end no-print">
       <button
       className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded-lg transition-all duration-200 shadow-lg shadow-blue-900/20"
-      onClick={handleExportPDF}
+      onClick={handleExport}
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        Export PDF
+        Export
       </button>
 
       <button
@@ -1244,8 +1263,11 @@ const ReportDetail: React.FC = () => {
       </div>
       </div>
     ) : (
-      <div className="flex justify-center items-center h-40">
+      <div className="flex flex-col justify-center items-center h-40 gap-2">
       <span className="text-gray-400 text-lg">No results available</span>
+      {error && (
+        <span className="text-red-400 text-sm text-center px-4">{error}</span>
+      )}
       </div>
     )}
 

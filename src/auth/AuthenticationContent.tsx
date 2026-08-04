@@ -1,12 +1,16 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { isTokenExpired } from '../api/api';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { isTokenExpired, apiCall, refreshAuthToken } from '../api/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   token: string | null;
   refreshToken: string | null;
+  /** Server-backed platform admin flag. null while loading / unknown. */
+  isAdmin: boolean | null;
+  adminLoading: boolean;
   login: (accessToken: string, refreshToken: string, remember: boolean) => void;
   logout: () => void;
+  refreshAdminStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -19,10 +23,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken')
   );
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!token && !isTokenExpired(token));
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [adminLoading, setAdminLoading] = useState<boolean>(false);
 
+  const logout = useCallback(() => {
+    localStorage.removeItem('jwtToken');
+    sessionStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('refreshToken');
+    setToken(null);
+    setRefreshToken(null);
+    setIsAuthenticated(false);
+    setIsAdmin(null);
+    setAdminLoading(false);
+
+    window.dispatchEvent(new Event('auth-change'));
+  }, []);
+
+  const refreshAdminStatus = useCallback(async () => {
+    const currentToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
+    if (!currentToken || isTokenExpired(currentToken)) {
+      setIsAdmin(false);
+      setAdminLoading(false);
+      return;
+    }
+
+    setAdminLoading(true);
+    try {
+      const res = await apiCall({ endpoint: '/auth/users/me', jwtToken: true });
+      setIsAdmin(Boolean(res?.message?.is_admin));
+    } catch {
+      // Non-admin (403) or failed lookup — treat as not admin for UI gating.
+      setIsAdmin(false);
+    } finally {
+      setAdminLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const checkToken = () => {
+    const checkToken = async () => {
       const currentToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
       const currentRefreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
       
@@ -30,11 +69,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRefreshToken(currentRefreshToken);
 
       if (currentToken && isTokenExpired(currentToken)) {
+        if (currentRefreshToken) {
+          const refreshed = await refreshAuthToken();
+          if (refreshed) {
+            const newToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
+            setToken(newToken);
+            setIsAuthenticated(!!newToken);
+            await refreshAdminStatus();
+            return;
+          }
+        }
         logout();
       } else if (currentToken) {
         setIsAuthenticated(true);
+        await refreshAdminStatus();
       } else {
         setIsAuthenticated(false);
+        setIsAdmin(null);
       }
     };
 
@@ -50,37 +101,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('storage', checkToken);
       clearInterval(interval);
     };
-  }, []);
+  }, [logout, refreshAdminStatus]);
 
-  const login = (accessToken: string, refreshToken: string, remember: boolean) => {
+  const login = (accessToken: string, refreshTokenValue: string, remember: boolean) => {
     const cookieConsent = localStorage.getItem("cookieConsent");
+    // Prefer sessionStorage; only persist to localStorage when Remember-me + consent.
     const useSessionStorage = !(remember && cookieConsent === "accepted");
     
     const storage = useSessionStorage ? sessionStorage : localStorage;
     storage.setItem("jwtToken", accessToken);
-    storage.setItem("refreshToken", refreshToken);
+    storage.setItem("refreshToken", refreshTokenValue);
     
     setToken(accessToken);
-    setRefreshToken(refreshToken);
+    setRefreshToken(refreshTokenValue);
     setIsAuthenticated(true);
 
     window.dispatchEvent(new Event('auth-change'));
   };
 
-  const logout = () => {
-    localStorage.removeItem('jwtToken');
-    sessionStorage.removeItem('jwtToken');
-    localStorage.removeItem('refreshToken');
-    sessionStorage.removeItem('refreshToken');
-    setToken(null);
-    setRefreshToken(null);
-    setIsAuthenticated(false);
-
-    window.dispatchEvent(new Event('auth-change'));
-  };
-
   return (
-    <AuthContext.Provider value={{ isAuthenticated, token, refreshToken, login, logout }}>
+    <AuthContext.Provider value={{
+      isAuthenticated,
+      token,
+      refreshToken,
+      isAdmin,
+      adminLoading,
+      login,
+      logout,
+      refreshAdminStatus,
+    }}>
       {children}
     </AuthContext.Provider>
   );

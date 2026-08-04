@@ -30,21 +30,8 @@ interface RecentUploadsResponse {
     page: number;
     per_page: number;
     total: number;
-  } | string | null;
+  } | null;
 }
-
-const normalizeUploadsErrorMessage = (rawMessage: string) => {
-  const lowered = rawMessage.toLowerCase();
-
-  if (
-    lowered.includes("psycopg2.errors.undefinedtable") ||
-    lowered.includes("relation \"uploads\" does not exist")
-  ) {
-    return "Uploads are temporarily unavailable due to a backend data issue. Please contact support.";
-  }
-
-  return rawMessage;
-};
 
 const formatDateTime = (isoString: string) => {
   const date = new Date(isoString);
@@ -73,13 +60,7 @@ const RecentFileUploads: React.FC = () => {
         jwtToken: true,
       });
 
-      if (
-        res.code === 'success' &&
-        res.message &&
-        typeof res.message === 'object' &&
-        'data' in res.message &&
-        Array.isArray(res.message.data)
-      ) {
+      if (res.code === 'success' && res.message && Array.isArray(res.message.data)) {
         setUploads(res.message.data);
         setHasNext(res.message.has_next || false);
         setHasPrev(res.message.has_prev || false);
@@ -89,15 +70,15 @@ const RecentFileUploads: React.FC = () => {
         setHasNext(false);
         setHasPrev(false);
         setTotal(0);
-
-        const apiMessage = typeof res.message === 'string'
-          ? res.message
-          : 'Unexpected API response structure or no data available.';
-        setError(normalizeUploadsErrorMessage(apiMessage));
+        // Provide a more specific error if the code is not 'success'
+        if (res.code !== 'success') {
+           setError('Failed to fetch uploads: ' + (res.message ? (res.message as any).toString() : 'Unknown error'));
+        } else {
+            setError('Unexpected API response structure or no data available.');
+        }
       }
     } catch (err: any) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch uploads';
-      setError(normalizeUploadsErrorMessage(message));
+      setError(err.message || 'Failed to fetch uploads');
       setUploads([]);
     } finally {
       setLoading(false);

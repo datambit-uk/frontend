@@ -8,6 +8,7 @@ import Report from '../pages/ReportPage';
 import MainLayout from '../components/MainLayout';
 import { AuthProvider } from '../auth/AuthenticationContent';
 import ProtectedRoute from './ProtectedRoute';
+import AdminRoute from './AdminRoute';
 import ReportDetail from '../pages/ReportDetail';
 import NotFoundPage from '../pages/NotFoundPage';
 import SupportPage from '../pages/SupportPage';
@@ -45,8 +46,8 @@ const AppRouter: React.FC = () => {
             <Route path="support" element={<SupportPage />} />
             <Route path="analysis" element={<AnalysisPage/>}/>
             <Route path="usage" element={<UsageDashboard />} />
-            <Route path="group-management" element={<AdminConsole />} />
-            <Route path="license-test" element={<LicenseTestDashboard />} />
+            <Route path="group-management" element={<AdminRoute><AdminConsole /></AdminRoute>} />
+            <Route path="license-test" element={<AdminRoute><LicenseTestDashboard /></AdminRoute>} />
             <Route path="settings/license" element={<LicenseSettings />} />
           </Route>
 

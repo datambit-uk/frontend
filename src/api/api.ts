@@ -1,62 +1,12 @@
-export const API_URL = "https://production.datambit.com";
+// Dev: same-origin relative URLs → Vite proxy → kubectl port-forwards.
+// Prod (GitHub Pages): public gateway host; app paths stay short (/auth, /upload, …).
+export const API_URL = import.meta.env.DEV ? "" : "https://production.datambit.com";
+
+/** @deprecated Prefer API_URL — identical host/path switching. */
+export const DIRECT_API_URL = API_URL;
 
 const headers = {
     "Content-Type": "application/json",
-};
-
-const NETWORK_ERROR_MESSAGE = "Can't reach the server. Check your connection and try again.";
-
-/**
- * The request never reached the API — DNS, TLS, CORS or an offline client.
- * Distinct from an API that responded with an error status.
- */
-export class ApiNetworkError extends Error {
-    constructor(message: string = NETWORK_ERROR_MESSAGE) {
-        super(message);
-        this.name = "ApiNetworkError";
-        // Required for `instanceof` to survive down-level compilation.
-        Object.setPrototypeOf(this, ApiNetworkError.prototype);
-    }
-}
-
-// fetch() rejects with a TypeError for every transport-level failure, and the
-// browser's wording ("Load failed" in Safari, "Failed to fetch" in Chrome) is
-// meaningless to users. Callers surface `error.message` directly, so that raw
-// text must never escape this module.
-const request = async (url: string, options: RequestInit): Promise<Response> => {
-    try {
-        return await fetch(url, options);
-    } catch {
-        throw new ApiNetworkError();
-    }
-};
-
-// Error responses are not guaranteed to be JSON — a misrouted request can return
-// an HTML error page, whose parse failure would otherwise reach the UI as
-// "Unexpected token '<'".
-const parseJsonBody = async (response: Response) => {
-    try {
-        return await response.json();
-    } catch {
-        return null;
-    }
-};
-
-/**
- * Absolute-path URL of the login screen, for the hard redirects below.
- *
- * The app is served from a sub-path on GitHub Pages (/frontend/) behind a
- * HashRouter, so the login screen lives at `<base>#/login`. A bare '/login'
- * resolves against the origin root and 404s. `window.location.pathname` is the
- * base: a HashRouter never changes it after the document loads. It is read at
- * call time rather than from `import.meta.env.BASE_URL` so this module stays
- * loadable under ts-jest's CommonJS transform.
- */
-export const loginUrl = (pathname: string = window.location.pathname): string =>
-    `${pathname.endsWith('/') || pathname.includes('.') ? pathname : `${pathname}/`}#/login`;
-
-const redirectToLogin = () => {
-    window.location.href = loginUrl();
 };
 
 export interface ApiCallParams {
@@ -74,8 +24,8 @@ export interface RefreshTokenResponse {
     refreshToken: string;
 }
 
-// Track if we're currently refreshing the token
-let isRefreshing = false;
+// Shared in-flight refresh so concurrent 401s wait on one request instead of failing.
+let refreshPromise: Promise<boolean> | null = null;
 
 const getJwtToken = (): string | null => {
     return localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken') ?? null;
@@ -85,21 +35,34 @@ const getRefreshToken = (): string | null => {
     return localStorage.getItem('refreshToken') ?? sessionStorage.getItem('refreshToken') ?? null;
 };
 
-export const isTokenExpired = (token: string | null): boolean => {
-    if (!token) return true;
+/**
+ * Decode JWT payload for non-security UX only (e.g. expiry checks).
+ * Claims are NOT verified and must NEVER be used for authorization decisions.
+ */
+export const getTokenClaims = (token: string | null): Record<string, unknown> | null => {
+    if (!token) return null;
     try {
         const parts = token.split('.');
-        if (parts.length < 2) return true;
-        
+        if (parts.length < 2) return null;
+
         const base64Url = parts[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
 
-        const payload = JSON.parse(jsonPayload);
+        return JSON.parse(jsonPayload);
+    } catch {
+        return null;
+    }
+};
+
+export const isTokenExpired = (token: string | null): boolean => {
+    if (!token) return true;
+    try {
+        const payload = getTokenClaims(token);
         if (!payload || typeof payload.exp !== 'number') return true;
-        
+
         const now = Math.floor(Date.now() / 1000);
         return payload.exp < now;
     } catch (e) {
@@ -122,54 +85,48 @@ const clearTokens = () => {
     window.dispatchEvent(new Event('auth-change'));
 };
 
-const refreshAuthToken = async (): Promise<boolean> => {
-    // If already refreshing, wait for the current refresh to complete
-    if (isRefreshing) {
-        return false;
+export const refreshAuthToken = async (): Promise<boolean> => {
+    if (refreshPromise) {
+        return refreshPromise;
     }
 
-    isRefreshing = true;
-    const refreshToken = getRefreshToken();
-    
-    if (!refreshToken) {
-        isRefreshing = false;
-        throw new Error("Refresh token missing");
-    }
-    
+    refreshPromise = (async () => {
+        const refreshToken = getRefreshToken();
+
+        if (!refreshToken) {
+            throw new Error("Refresh token missing");
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/auth/refresh`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${refreshToken}`,
+                },
+                mode: "cors"
+            });
+
+            if (!response.ok) {
+                throw new Error("Token refresh failed");
+            }
+
+            const data = await response.json();
+
+            const useSessionStorage = !localStorage.getItem('jwtToken') && !!sessionStorage.getItem('jwtToken');
+            saveTokens(data.message, refreshToken, useSessionStorage);
+
+            return true;
+        } catch (error) {
+            console.error("Failed to refresh token:", error);
+            return false;
+        }
+    })();
+
     try {
-        const response = await request(`${API_URL}/auth/refresh`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${refreshToken}`,
-            },
-            mode: "cors"
-        });
-
-        if (!response.ok) {
-            throw new Error("Token refresh failed");
-        }
-
-        const data = await parseJsonBody(response);
-
-        if (!data?.message) {
-            throw new Error("Token refresh failed");
-        }
-
-        const useSessionStorage = !localStorage.getItem('jwtToken') && !!sessionStorage.getItem('jwtToken');
-        saveTokens(data.message, refreshToken, useSessionStorage);
-
-        return true;
-    } catch (error) {
-        // An unreachable server is not an expired session — let it propagate so the
-        // caller reports a connection problem instead of forcing a logout.
-        if (error instanceof ApiNetworkError) {
-            throw error;
-        }
-        console.error("Failed to refresh token:", error);
-        return false;
+        return await refreshPromise;
     } finally {
-        isRefreshing = false;
+        refreshPromise = null;
     }
 };
 
@@ -202,7 +159,7 @@ export const apiCall = async ({
     if (jwtToken) {
         let token = getJwtToken();
         if (token === null) {
-            redirectToLogin();
+            window.location.href = '/login';
             throw new Error("Token missing");
         }
 
@@ -212,7 +169,7 @@ export const apiCall = async ({
                 token = getJwtToken();
             } else {
                 clearTokens();
-                redirectToLogin();
+                window.location.href = '/login';
                 throw new Error("Session expired. Redirecting to login page.");
             }
         }
@@ -231,7 +188,7 @@ export const apiCall = async ({
     }
 
     // First attempt
-    let response = await request(url, options);
+    let response = await fetch(url, options);
     
     // If unauthorized and we haven't tried refreshing yet
     if (auto_refresh && response.status === 401 ) {
@@ -247,29 +204,35 @@ export const apiCall = async ({
                 };
                 
                 // Second attempt with new token
-                response = await request(url, options);
+                response = await fetch(url, options);
             }
         } else {
             // Clear tokens and redirect if refresh failed
             clearTokens();
-            redirectToLogin();
+            window.location.href = '/login';
             throw new Error("Authentication failed. Redirecting to login page.");
         }
     }
     
-    const data = await parseJsonBody(response);
-
     if (!response.ok) {
         if (response.status === 401) {
             clearTokens();
-            redirectToLogin();
+            window.location.href = '/login';
         }
-        throw new Error(data?.message || `Error: ${response.status}`);
+        // Error bodies are not always JSON (e.g. the dev proxy returns plain
+        // text when a port-forward is down), so parse defensively.
+        const text = await response.text();
+        let message = `Error: ${response.status}`;
+        try {
+            const parsed = JSON.parse(text);
+            message = parsed.message || parsed.error || message;
+        } catch {
+            if (text) {
+                message = `Error: ${response.status} - ${text.slice(0, 200)}`;
+            }
+        }
+        throw new Error(message);
     }
 
-    if (data === null) {
-        throw new Error("Received an invalid response from the server.");
-    }
-
-    return data;
+    return response.json();
 };

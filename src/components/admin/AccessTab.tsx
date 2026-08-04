@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiCall } from '../../api/api';
-import { AlertCircle, ChevronDown, ChevronRight, KeyRound } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, KeyRound, Copy, Check } from 'lucide-react';
 import { UserRow, ROLE_OPTIONS, roleLabel } from './types';
 
 const AccessTab: React.FC = () => {
@@ -8,11 +8,12 @@ const AccessTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Generate access code
+  // Generate access code — default to User (least privilege), not Admin
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<number>(ROLE_OPTIONS[0].id);
+  const [role, setRole] = useState<number>(5);
   const [generating, setGenerating] = useState(false);
-  const [generatedForEmail, setGeneratedForEmail] = useState<string | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<{ email: string; access_code: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Role management
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -36,23 +37,34 @@ const AccessTab: React.FC = () => {
 
   const handleGenerate = async () => {
     if (!email.trim()) return;
-    const inviteEmail = email.trim();
     setGenerating(true);
-    setGeneratedForEmail(null);
+    setGeneratedCode(null);
+    setCopied(false);
     try {
-      await apiCall({
+      const res = await apiCall({
         endpoint: '/auth/save/generate-access-code',
         method: 'POST',
-        body: { email: inviteEmail, role },
+        body: { email: email.trim(), role },
         jwtToken: true,
       });
-      setGeneratedForEmail(inviteEmail);
+      setGeneratedCode(res.message ?? null);
       setEmail('');
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to generate access code');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const copyCode = async () => {
+    if (!generatedCode) return;
+    try {
+      await navigator.clipboard.writeText(generatedCode.access_code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — code is still shown on screen
     }
   };
 
@@ -130,10 +142,19 @@ const AccessTab: React.FC = () => {
           </button>
         </div>
 
-        {generatedForEmail && (
-          <div className="mt-4 bg-black/40 border border-green-800/50 rounded-lg p-4">
-            <p className="text-sm uppercase font-bold text-green-400">Access code for {generatedForEmail}</p>
-            <p className="text-xs text-gray-500 mt-1">Valid for 72 hours</p>
+        {generatedCode && (
+          <div className="mt-4 bg-black/40 border border-green-800/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-gray-500 uppercase font-bold mb-1">Access code for {generatedCode.email}</p>
+              <p className="text-2xl font-mono tracking-widest text-green-400">{generatedCode.access_code}</p>
+              <p className="text-xs text-gray-500 mt-1">Also emailed to the user. They use it to complete registration.</p>
+            </div>
+            <button
+              onClick={copyCode}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm self-start"
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copied' : 'Copy'}
+            </button>
           </div>
         )}
       </div>

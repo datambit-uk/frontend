@@ -13,6 +13,26 @@ export default {
         jsx: 'react-jsx',
         esModuleInterop: true,
         allowSyntheticDefaultImports: true,
+        module: 'esnext',
+        target: 'es2020',
+      },
+      diagnostics: false,
+      astTransformers: {
+        before: [
+          {
+            path: 'ts-jest-mock-import-meta',
+            options: {
+              metaObjectReplacement: {
+                env: {
+                  DEV: false,
+                  PROD: true,
+                  MODE: 'test',
+                  BASE_URL: '/',
+                },
+              },
+            },
+          },
+        ],
       },
     }],
   },

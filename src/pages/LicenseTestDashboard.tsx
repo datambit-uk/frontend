@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Shield, Upload, Play, History, CheckCircle, XCircle, Clock, Smartphone, Database, AlertCircle, RefreshCw } from "lucide-react";
-import { API_URL } from "../api/api";
+import { apiCall, API_URL } from "../api/api";
 
 interface PhoneHomeResponse {
   valid: boolean;
@@ -35,23 +35,23 @@ const LicenseTestDashboard: React.FC = () => {
   const [lastResponse, setLastResponse] = useState<PhoneHomeResponse | null>(null);
   const [history, setHistory] = useState<CallLogEntry[]>([]);
 
-  // Licensing is served by usage-tracking-service, so the public prefix is
-  // /usage (rewritten to /api/v1/usage at the Gateway) — there is no
-  // licensing service of its own.
+  // Fixed path: prefix is /usage, not /api/v1/licensing
   const ENDPOINT_PREFIX = "/usage";
 
   const fetchLicenses = async () => {
     try {
       setFetching(true);
-      const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/licenses`);
-      if (!response.ok) throw new Error("Failed to fetch licenses");
-      const data = await response.json();
+      const data = await apiCall({
+        endpoint: `${ENDPOINT_PREFIX}/licenses`,
+        jwtToken: true,
+      });
       setAvailableLicenses(data);
       if (data.length > 0 && !activeLicenseId) {
         setActiveLicenseId(data[0].license_id);
       }
     } catch (err) {
       console.error(err);
+      setError(`Failed to fetch licenses: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setFetching(false);
     }
@@ -86,19 +86,27 @@ const LicenseTestDashboard: React.FC = () => {
       setSyncing(true);
       setError(null);
 
-      // The backend store_license expects { "license": {...}, "signature": "..." }
-      // If user pasted a flat response, we might need to wrap it, but usually 
-      // they should paste the generator output for a new sync.
-      const payload = parsed.license ? parsed : { license: parsed, signature: parsed.signature || "MOCK_SIG" };
+      // Backend store_license expects { "license": {...}, "signature": "..." }.
+      // Require a real signature — never invent MOCK_SIG.
+      let payload: { license: unknown; signature: string };
+      if (parsed.license) {
+        if (!parsed.signature) {
+          throw new Error("Missing signature in license payload");
+        }
+        payload = { license: parsed.license, signature: parsed.signature };
+      } else if (parsed.signature) {
+        const { signature, ...license } = parsed;
+        payload = { license, signature };
+      } else {
+        throw new Error("Missing signature — paste generator output with a valid signature");
+      }
 
-      const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/licenses`, {
+      const result = await apiCall({
+        endpoint: `${ENDPOINT_PREFIX}/licenses`,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: payload,
+        jwtToken: true,
       });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
 
       setActiveLicenseId(result.license_id);
       fetchLicenses(); // Refresh the dropdown
@@ -129,7 +137,7 @@ const LicenseTestDashboard: React.FC = () => {
     };
 
     try {
-      // Corrected endpoint path
+      // Phone-home remains anonymous (device clients); licenses APIs require admin JWT.
       const response = await fetch(`${API_URL}${ENDPOINT_PREFIX}/phone-home`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

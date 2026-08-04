@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Users, UserPlus, Trash2, Edit, ChevronRight, Shield, ShieldAlert, PlusCircle, ArrowLeft } from "lucide-react";
 import { API_URL } from "../api/api";
 
+/**
+ * @deprecated Orphaned — not registered in AppRouter. Prefer AdminConsole
+ * (GroupsTab) for group management. Kept only for historical reference.
+ */
 interface Group {
   id: string;
   name: string;

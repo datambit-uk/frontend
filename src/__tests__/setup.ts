@@ -1,4 +1,13 @@
 import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+
+// react-router (v7) expects Web TextEncoder in the Jest jsdom environment
+if (typeof globalThis.TextEncoder === 'undefined') {
+  globalThis.TextEncoder = TextEncoder as typeof globalThis.TextEncoder;
+}
+if (typeof globalThis.TextDecoder === 'undefined') {
+  globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
+}
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

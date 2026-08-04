@@ -5,26 +5,6 @@ import { apiCall } from "../api/api";
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-interface ApiResult {
-  code?: string;
-  message?: unknown;
-}
-
-const getApiMessage = (message: unknown, fallback: string) => {
-  if (typeof message === "string" && message.trim().length > 0) {
-    return message;
-  }
-
-  if (message && typeof message === "object") {
-    const detail = (message as Record<string, unknown>).detail;
-    if (typeof detail === "string" && detail.trim().length > 0) {
-      return detail;
-    }
-  }
-
-  return fallback;
-};
-
 const PasswordReset: React.FC = () => {
   // Form states
   const [email, setEmail] = useState("");
@@ -98,22 +78,12 @@ const PasswordReset: React.FC = () => {
             endpoint: "/auth/request/reset-password",
             method: "POST",
             body: { username: email },
-        }) as ApiResult;
-
-        if (response?.code && response.code !== "success") {
-          throw new Error(getApiMessage(response.message, "Failed to send OTP. Please try again."));
-        }
-
-        setSuccess("OTP has been sent to your email address");
+        });
+        console.log(response);
+        setSuccess("If an account exists for that email, an OTP has been sent");
         setStep(2);
     } catch (err: any) {
-        const apiMessage = err instanceof Error ? err.message : "";
-
-        if (apiMessage.toLowerCase().includes("user doesnt exist") || apiMessage.toLowerCase().includes("user doesn't exist")) {
-            setError("Cannot find the user with given Email Id");
-        } else {
-            setError(apiMessage || "Failed to send OTP. Please try again.");
-        }
+        setError("Failed to send OTP. Please try again.");
     } finally {
         setIsLoading(false);
     }
@@ -149,15 +119,11 @@ const PasswordReset: React.FC = () => {
     try {
         setIsLoading(true);
 
-        const response = await apiCall({
+        await apiCall({
             endpoint: "/auth/update/reset-password",
             method: "POST",
             body: { username: email , password : password , access_code: otp},
-        }) as ApiResult;
-
-        if (response?.code && response.code !== "success") {
-          throw new Error(getApiMessage(response.message, "Failed to reset password. Please verify your OTP and try again."));
-        }
+        });
       
         setSuccess("Password has been reset successfully! You can now login with your new password.");
 
@@ -166,8 +132,7 @@ const PasswordReset: React.FC = () => {
         }, 3000);
 
     } catch (err: any) {
-      const apiMessage = err instanceof Error ? err.message : "";
-      setError(apiMessage || "Failed to reset password. Please verify your OTP and try again.");
+      setError("Failed to reset password. Please verify your OTP and try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -197,7 +162,9 @@ const PasswordReset: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="bg-gray-900/90 backdrop-blur-lg rounded-lg shadow-2xl p-8 border border-gray-800"
         >
-          <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="mx-auto h-20 mb-4" />
+          <div className="w-fit mx-auto mb-4">
+            <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="h-20" />
+          </div>
           
           <motion.div
             initial={{ y: -20, opacity: 0 }}
@@ -456,14 +423,13 @@ const PasswordReset: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-400">
               Remember your password?{" "}
-              <motion.button
+              <motion.a
                 whileHover={{ scale: 1.05 }}
-                type="button"
-                onClick={() => navigate("/login")}
+                href="/login"
                 className="font-medium text-blue-400 hover:text-blue-300"
               >
                 Sign in
-              </motion.button>
+              </motion.a>
             </p>
           </div>
         </motion.div>

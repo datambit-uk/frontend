@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, LogOut, Clock, FolderOpen, BarChart3, Shield, LifeBuoy } from "lucide-react";
+import { useAuth } from "../auth/AuthenticationContent";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -18,24 +19,8 @@ const navItems = [
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  const isAdmin = useMemo(() => {
-    try {
-      const token = localStorage.getItem('jwtToken') ?? sessionStorage.getItem('jwtToken');
-      if (!token) return false;
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-
-      const payload = JSON.parse(jsonPayload);
-      const sub = JSON.parse(payload.sub);
-      return sub.role === 4;
-    } catch (e) {
-      return false;
-    }
-  }, []);
+  // Server-backed admin flag — never decode JWT role claims for authorization UX.
+  const { isAdmin } = useAuth();
 
   const visibleNavItems = useMemo(() => {
     const items = [...navItems];
@@ -64,9 +49,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
       {/* Logo Section */}
       <div className="p-6 border-b border-gray-800/50">
         <div className="flex items-center justify-center">
-          <img 
-            src={import.meta.env.BASE_URL + 'datambit_logo.png'} 
-            alt="Datambit Logo" 
+          <img
+            src={import.meta.env.BASE_URL + 'datambit_logo.png'}
+            alt="Datambit Logo"
             className="w-full h-12 object-contain"
           />
         </div>
