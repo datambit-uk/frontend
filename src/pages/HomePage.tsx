@@ -33,7 +33,7 @@ const Home: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [generateHeatmap, setGenerateHeatmap] = useState(false);
+  const [generateHeatmap, setGenerateHeatmap] = useState(true);
   const [copied, setCopied] = useState(false);
   const [dropboxKey, setDropboxKey] = useState(0);
   const [rejectedFiles, setRejectedFiles] = useState<RejectedFile[]>([]);
