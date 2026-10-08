@@ -62,6 +62,32 @@ describe('reportNormalize', () => {
     ]);
   });
 
+  it('normalizeVideo keeps window verdicts and the report aggregation methods', () => {
+    const r = normalizeVideo({
+      verdict: 'fake',
+      windows: [
+        { start_sec: 0, end_sec: 2.5, verdict: 'REAL', real_confidence: 0.9, fake_confidence: 0.1 },
+        { start_sec: 2.5, end_sec: 5, verdict: 'FAKE', real_confidence: 0.2, fake_confidence: 0.8 },
+      ],
+      aggregations: {
+        max_fake_confidence: { verdict: 'FAKE', fake_confidence: 0.8 },
+        dual_branch: { verdict: 'FAKE', fake_confidence: 0.6 },
+        majority_vote: { verdict: 'REAL', fake_confidence: 0.5 },
+        max_confidence: { verdict: 'REAL', fake_confidence: 0.1 },
+        min_confidence: { verdict: 'REAL', fake_confidence: 0.05 },
+      },
+    });
+    expect(r.windows).toEqual([
+      { startSec: 0, endSec: 2.5, verdict: 'REAL', confidence: 0.9 },
+      { startSec: 2.5, endSec: 5, verdict: 'FAKE', confidence: 0.8 },
+    ]);
+    expect(r.aggregations?.map((item) => item.label)).toEqual([
+      'Max fake',
+      'Dual branch',
+      'Majority vote',
+    ]);
+  });
+
   it('normalizeAudio includes transcript, importance, and rationale on segments', () => {
     const r = normalizeAudio({
       verdict: 'fake',

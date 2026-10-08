@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 import { PrintableReport } from './report/PrintableReport';
+import { VideoWindowTimeline } from './report/VideoWindowTimeline';
 import {
   collectHeatmapUrls,
   downloadHeatmapFiles,
@@ -274,6 +275,12 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
             </div>
           </div>
         )}
+
+        <VideoWindowTimeline
+          windows={v.windows || v.window_predictions}
+          aggregations={v.aggregations || v.aggregation_results}
+          activeMethod={v.fusion_diagnostics?.method}
+        />
       </div>
 
       {heatmapUrls && heatmapUrls.length > 0 && (

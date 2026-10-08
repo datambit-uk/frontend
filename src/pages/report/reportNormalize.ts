@@ -10,6 +10,8 @@
 // or confidence logic in either place, update the other to match. Follow-up:
 // refactor those on-screen sections to consume these helpers.
 
+import { REPORT_AGGREGATIONS } from './aggregationMethods';
+
 export interface FlaggedSegment {
   startSec: number;
   endSec: number;
@@ -35,6 +37,13 @@ export interface NormalizedVideo {
   facesDetected: number | null;
   avgInferenceMs: number | null;
   classScores: { name: string; score: number }[];
+  windows?: Array<{
+    startSec: number;
+    endSec: number;
+    verdict: string;
+    confidence: number;
+  }>;
+  aggregations?: Array<{ method: string; label: string; verdict: string; fakePct: number; explanation: string }>;
 }
 
 export interface NormalizedAudio {
@@ -107,6 +116,36 @@ export function normalizeVideo(v: any): NormalizedVideo {
     facesDetected: num(v?.faces_detected),
     avgInferenceMs: num(v?.avg_inference_ms),
     classScores,
+    windows: Array.isArray(v?.windows)
+      ? v.windows
+          .filter((window: any) => Number.isFinite(Number(window?.start_sec)) && Number.isFinite(Number(window?.end_sec)))
+          .map((window: any) => {
+            const verdict = String(window.verdict || 'UNKNOWN').toUpperCase();
+            const confidence = verdict === 'FAKE'
+              ? Number(window.fake_confidence ?? 0)
+              : Number(window.real_confidence ?? 0);
+            return {
+              startSec: Number(window.start_sec),
+              endSec: Number(window.end_sec),
+              verdict,
+              confidence: Number.isFinite(confidence) ? confidence : 0,
+            };
+          })
+      : [],
+    aggregations: v?.aggregations && typeof v.aggregations === 'object'
+      ? REPORT_AGGREGATIONS
+          .filter((method) => v.aggregations[method.id] && typeof v.aggregations[method.id] === 'object')
+          .map((method) => {
+            const result = v.aggregations[method.id];
+            return {
+              method: method.id,
+              label: method.label,
+              verdict: String(result?.verdict || 'UNKNOWN').toUpperCase(),
+              fakePct: Number(result?.fake_confidence ?? 0) * 100,
+              explanation: method.explanation,
+            };
+          })
+      : [],
   };
 }
 

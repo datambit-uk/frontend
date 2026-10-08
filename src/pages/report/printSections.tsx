@@ -87,6 +87,52 @@ export const PrintVideoSection: React.FC<{ data: NormalizedVideo }> = ({ data })
     {data.avgInferenceMs !== null && (
       <Row label="Avg Inference" value={`${data.avgInferenceMs.toFixed(2)} ms`} />
     )}
+    {Array.isArray(data.windows) && data.windows.length > 0 && (
+      <div style={{ marginTop: 8 }}>
+        <p style={{ fontSize: 9, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', margin: '0 0 3px' }}>
+          Window timeline
+        </p>
+        <div style={{ position: 'relative', height: 14, background: '#e5e7eb', borderRadius: 3, overflow: 'hidden' }}>
+          {data.windows.map((window, index) => {
+            const span = Math.max(...data.windows!.map((item) => item.endSec), 1e-6);
+            const fake = window.verdict === 'FAKE';
+            const intensity = Math.min(1, Math.max(0.25, window.confidence));
+            return (
+              <div
+                key={`${window.startSec}-${index}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: `${(window.startSec / span) * 100}%`,
+                  width: `${Math.max(((window.endSec - window.startSec) / span) * 100, 0.6)}%`,
+                  background: fake
+                    ? `rgba(185, 28, 28, ${intensity})`
+                    : `rgba(21, 128, 61, ${intensity})`,
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+    )}
+    {Array.isArray(data.aggregations) && data.aggregations.length > 0 && (
+      <div style={{ marginTop: 6 }}>
+        {data.aggregations.map((item) => (
+          <div key={item.method} style={{ marginTop: 4 }}>
+            <Row
+              label={item.label || item.method.replace(/_/g, ' ')}
+              value={`${item.verdict} ${item.fakePct.toFixed(1)}%`}
+            />
+            {item.explanation && (
+              <p style={{ fontSize: 9, color: '#6b7280', margin: '0 0 2px', lineHeight: 1.35 }}>
+                {item.explanation}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
     {data.classScores.length > 0 && (
       <div style={{ marginTop: 6 }}>
         <p style={{ fontSize: 9, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', margin: '0 0 3px' }}>
