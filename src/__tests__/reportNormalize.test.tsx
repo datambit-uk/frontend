@@ -73,6 +73,7 @@ describe('reportNormalize', () => {
         max_fake_confidence: { verdict: 'FAKE', fake_confidence: 0.8 },
         dual_branch: { verdict: 'FAKE', fake_confidence: 0.6 },
         majority_vote: { verdict: 'REAL', fake_confidence: 0.5 },
+        persistent_peak_run: { verdict: 'FAKE', fake_confidence: 0.7 },
         max_confidence: { verdict: 'REAL', fake_confidence: 0.1 },
         min_confidence: { verdict: 'REAL', fake_confidence: 0.05 },
       },
@@ -82,6 +83,7 @@ describe('reportNormalize', () => {
       { startSec: 2.5, endSec: 5, verdict: 'FAKE', confidence: 0.8 },
     ]);
     expect(r.aggregations?.map((item) => item.label)).toEqual([
+      'Peak run',
       'Max fake',
       'Dual branch',
       'Majority vote',
