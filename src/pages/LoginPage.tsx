@@ -68,7 +68,7 @@ const LoginPage: React.FC = () => {
     setRegisterError("");
     setIsRegisterSuccess(false);
 
-    // Validate access code
+    // Validate access code (matches auth RegisterSchema equal=10)
     if (!/^[A-Z0-9]{10}$/.test(accessCode)) {
       setRegisterError("Access code must be exactly 10 alphanumeric characters");
       return;

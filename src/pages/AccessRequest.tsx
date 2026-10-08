@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { User, Building2, Briefcase, Mail, Phone, FileText, Loader2, AlertCircle, Check, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { apiCall } from "../api/api";
+import DevWatermark from "../components/DevWatermark";
 
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 
@@ -200,8 +201,9 @@ const AccessRequest: React.FC = () => {
         className="w-full max-w-2xl relative"
       >
         <div className="bg-gray-900/90 backdrop-blur-lg rounded-lg shadow-2xl p-8 border border-gray-800 max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-          <div className="w-fit mx-auto mb-4">
+          <div className="relative w-fit mx-auto mb-4">
             <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="h-20" />
+            <DevWatermark className="text-2xl px-3 py-1.5 border-[3px]" />
           </div>
           
           <div className="text-center mb-8">

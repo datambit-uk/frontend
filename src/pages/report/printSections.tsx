@@ -74,7 +74,7 @@ export const PrintImageSection: React.FC<{ data: NormalizedImage }> = ({ data })
 );
 
 export const PrintVideoSection: React.FC<{ data: NormalizedVideo }> = ({ data }) => (
-  <Card title="Video Analysis">
+  <Card title="Video Forensic Analysis">
     <VerdictBadge verdict={data.verdict} />
     <Row label="Predicted Class" value={data.predictedClass} />
     <Row label="Fake Confidence" value={`${data.fakePct.toFixed(2)}%`} />
@@ -143,11 +143,70 @@ export const PrintVideoSection: React.FC<{ data: NormalizedVideo }> = ({ data })
         ))}
       </div>
     )}
+    {(data.heatmapFocusSummary || data.attentionQuality || data.heatmapAuditRationale) && (
+      <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e5e7eb' }}>
+        <p style={{ fontSize: 9, fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', margin: '0 0 4px' }}>
+          Heatmap Analysis
+        </p>
+        {data.attentionQuality && (
+          <Row
+            label="Attention"
+            value={
+              data.heatmapAuditRisk
+                ? `${data.attentionQuality} · Risk ${data.heatmapAuditRisk}`
+                : data.attentionQuality
+            }
+          />
+        )}
+        {data.heatmapFocusSummary && (
+          <p style={{ fontSize: 10, color: '#374151', margin: '4px 0 0', lineHeight: 1.4 }}>
+            {data.heatmapFocusSummary}
+          </p>
+        )}
+        {data.heatmapAuditRationale && (
+          <p style={{ fontSize: 10, color: '#6b7280', margin: '4px 0 0', lineHeight: 1.4, fontStyle: 'italic' }}>
+            {data.heatmapAuditRationale}
+          </p>
+        )}
+      </div>
+    )}
+  </Card>
+);
+
+export type NormalizedObviousDeepfake = {
+  verdict: string;
+  confidencePct: number | null;
+  rationale: string;
+  reasons: string[];
+  isObvious: boolean;
+};
+
+export const PrintObviousDeepfakeSection: React.FC<{ data: NormalizedObviousDeepfake }> = ({ data }) => (
+  <Card title="Perceptual Visual Screening">
+    <VerdictBadge verdict={data.verdict} />
+    {data.confidencePct !== null && (
+      <Row label="Confidence" value={`${data.confidencePct.toFixed(1)}%`} />
+    )}
+    {data.rationale && (
+      <p style={{ fontSize: 10, color: '#374151', margin: '4px 0', lineHeight: 1.4 }}>{data.rationale}</p>
+    )}
+    {data.reasons.length > 0 && (
+      <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 9, color: '#4b5563' }}>
+        {data.reasons.map((r, i) => (
+          <li key={i}>{r}</li>
+        ))}
+      </ul>
+    )}
+    <p style={{ fontSize: 9, color: '#6b7280', fontStyle: 'italic', margin: '6px 0 0' }}>
+      {data.isObvious
+        ? 'Flagged as an obvious deepfake before forensic models ran.'
+        : 'No glaring cues; forensic video/audio models assess subtle signals.'}
+    </p>
   </Card>
 );
 
 export const PrintAudioSection: React.FC<{ data: NormalizedAudio }> = ({ data }) => (
-  <Card title="Audio Analysis">
+  <Card title="Audio Forensic Analysis">
     <VerdictBadge verdict={data.verdict} />
     {data.isNoSpeech ? (
       <p style={{ fontSize: 10, color: '#a16207', fontStyle: 'italic', margin: 0 }}>
@@ -186,17 +245,26 @@ export const PrintAudioSection: React.FC<{ data: NormalizedAudio }> = ({ data })
                 <div style={{ fontFamily: 'monospace', color: verdictColor(s.verdict) }}>
                   {s.startSec.toFixed(0)}s–{s.endSec.toFixed(0)}s [{s.verdict}]
                 </div>
-                {(s.importanceLabel || s.importanceScorePct != null) && (
-                  <div style={{ color: '#6b7280' }}>
-                    Importance:{' '}
-                    {s.importanceLabel || 'UNKNOWN'}
-                    {s.importanceScorePct != null &&
-                      ` (${s.importanceScorePct.toFixed(1)}%)`}
-                  </div>
-                )}
-                {s.transcription && (
+                {(() => {
+                  const rawLabel = s.importanceLabel ? String(s.importanceLabel).trim() : '';
+                  const labelOk =
+                    !!rawLabel &&
+                    !['UNKNOWN', 'NEGLIGIBLE', 'UNKNOWN/NEGLIGIBLE', 'N/A', 'NONE', 'MISSING', 'NOT_AVAILABLE'].includes(
+                      rawLabel.toUpperCase()
+                    );
+                  const hasScore = s.importanceScorePct != null;
+                  if (!labelOk && !hasScore) return null;
+                  return (
+                    <div style={{ color: '#6b7280' }}>
+                      Importance:
+                      {labelOk ? ` ${rawLabel}` : ''}
+                      {hasScore ? ` (${s.importanceScorePct!.toFixed(1)}%)` : ''}
+                    </div>
+                  );
+                })()}
+                {s.transcription && String(s.transcription).trim() && (
                   <div style={{ color: '#4b5563', fontStyle: 'italic' }}>
-                    Transcript: "{s.transcription}"
+                    Transcript: "{String(s.transcription).trim()}"
                   </div>
                 )}
                 {s.rationale && (
@@ -211,7 +279,10 @@ export const PrintAudioSection: React.FC<{ data: NormalizedAudio }> = ({ data })
   </Card>
 );
 
-export const PrintMetadataSection: React.FC<{ data: NormalizedMetadata }> = ({ data }) => {
+export const PrintMetadataSection: React.FC<{
+  data: NormalizedMetadata;
+  omitForensicExplanation?: boolean;
+}> = ({ data, omitForensicExplanation = false }) => {
   const sectionTitle = (title: string, color = '#9ca3af') => (
     <p
       style={{
@@ -269,7 +340,7 @@ export const PrintMetadataSection: React.FC<{ data: NormalizedMetadata }> = ({ d
         border: '1px solid #d1d5db',
         borderRadius: 6,
         padding: '8px 10px',
-        // Long Gemini prose may span pages — allow breaks rather than clipping.
+        // Long evidence prose may span pages — allow breaks rather than clipping.
         breakInside: 'auto',
       }}
     >
@@ -312,10 +383,10 @@ export const PrintMetadataSection: React.FC<{ data: NormalizedMetadata }> = ({ d
         )}
       </div>
 
-      {/* Gemini forensic signals — stacked prose, not flex rows */}
+      {/* Evidence collation prose — stacked blocks, not flex rows */}
       {data.summaries.length > 0 && (
         <div style={{ marginTop: 4 }}>
-          {sectionTitle('Gemini Forensic Signals', '#2563eb')}
+          {sectionTitle('Evidence Collation and Explanation', '#2563eb')}
           {data.summaries.map((s) => proseBlock(s.label, s.value))}
         </div>
       )}
@@ -355,7 +426,7 @@ export const PrintMetadataSection: React.FC<{ data: NormalizedMetadata }> = ({ d
         </div>
       )}
 
-      {data.forensicExplanation && (
+      {data.forensicExplanation && !omitForensicExplanation && (
         <div
           style={{
             marginTop: 4,
@@ -365,7 +436,7 @@ export const PrintMetadataSection: React.FC<{ data: NormalizedMetadata }> = ({ d
             border: '1px solid #e5e7eb',
           }}
         >
-          {sectionTitle('Gemini Synthesis', '#6b7280')}
+          {sectionTitle('Synthesis', '#6b7280')}
           <p style={{ fontSize: 9.5, color: '#1f2937', margin: 0, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
             {data.forensicExplanation}
           </p>

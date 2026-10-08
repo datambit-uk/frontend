@@ -1,9 +1,27 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Video, Copy, Check, X, AlertTriangle, Trash2 } from "lucide-react";
+import {
+  Video,
+  Copy,
+  Check,
+  X,
+  AlertTriangle,
+  Trash2,
+  Mic,
+  Sparkles,
+  ScanSearch,
+} from "lucide-react";
 import Dropbox from "../components/Dropbox";
 import { useMaintenance } from "../config/maintenance";
-import { API_URL } from "../api/api";
+import { API_URL, apiCall } from "../api/api";
+import {
+  FEATURE_CATALOG,
+  FeatureId,
+  FeatureSelection,
+  emptyFeatureSelection,
+  featuresPayload,
+  selectionFromPermissions,
+} from "../config/features";
 
 interface RejectedFile {
   filename: string;
@@ -14,6 +32,13 @@ interface UploadResponse {
   code: string;
   message: string;
 }
+
+const FEATURE_ICONS: Record<FeatureId, React.ReactNode> = {
+  heatmaps: <Video className="w-6 h-6" />,
+  audio_importance: <Mic className="w-6 h-6" />,
+  gemini_reasoning: <Sparkles className="w-6 h-6" />,
+  gemini_heatmap_audit: <ScanSearch className="w-6 h-6" />,
+};
 
 class UploadValidationError extends Error {
   rejectedFiles: RejectedFile[];
@@ -33,7 +58,13 @@ const Home: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [generateHeatmap, setGenerateHeatmap] = useState(true);
+  const [entitled, setEntitled] = useState<FeatureSelection>(
+    emptyFeatureSelection()
+  );
+  const [selectedFeatures, setSelectedFeatures] = useState<FeatureSelection>(
+    emptyFeatureSelection()
+  );
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dropboxKey, setDropboxKey] = useState(0);
   const [rejectedFiles, setRejectedFiles] = useState<RejectedFile[]>([]);
@@ -47,6 +78,52 @@ const Home: React.FC = () => {
   });
   const [countdown, setCountdown] = useState(2);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiCall({
+          endpoint: "/auth/users/me/permissions",
+          method: "GET",
+          jwtToken: true,
+        });
+        const perms =
+          response?.code === "success" && response.message
+            ? (response.message as Record<string, unknown>)
+            : null;
+        const next = selectionFromPermissions(perms);
+        if (!cancelled) {
+          setEntitled(next.entitled);
+          setSelectedFeatures(next.selected);
+        }
+      } catch (err) {
+        console.error("Failed to load feature permissions:", err);
+        if (!cancelled) {
+          // Fail closed for optional features; heatmaps stays opt-in via UI once loaded.
+          setEntitled(emptyFeatureSelection());
+          setSelectedFeatures(emptyFeatureSelection());
+        }
+      } finally {
+        if (!cancelled) setFeaturesLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleFeature = useCallback((id: FeatureId) => {
+    setSelectedFeatures((prev) => {
+      if (!entitled[id]) return prev;
+      const next = { ...prev, [id]: !prev[id] };
+      // Heatmap audit only makes sense with heatmaps on.
+      if (id === "heatmaps" && !next.heatmaps) {
+        next.gemini_heatmap_audit = false;
+      }
+      return next;
+    });
+  }, [entitled]);
 
   useEffect(() => {
     if (responseMessage.status === "success" && responseMessage.uploadId) {
@@ -144,13 +221,12 @@ const Home: React.FC = () => {
     setResponseMessage({ status: null, message: "" });
     setRejectedFiles([]);
 
-    const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-    const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB
-    if (totalSize > MAX_TOTAL_SIZE) {
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB — matches upload service
+    const tooLarge = files.find((file) => file.size > MAX_FILE_SIZE);
+    if (tooLarge) {
       setResponseMessage({
         status: "error",
-        message:
-          "Total file size exceeds 500MB limit. Please reduce the number of files or their sizes.",
+        message: `File "${tooLarge.name}" exceeds the 500MB limit.`,
       });
       setIsUploading(false);
       return;
@@ -194,7 +270,9 @@ const Home: React.FC = () => {
       return new Promise((resolve, reject) => {
         const formData = new FormData();
         group.files.forEach((file) => formData.append("files", file));
-        if (generateHeatmap) {
+        const features = featuresPayload(selectedFeatures);
+        formData.append("features", JSON.stringify(features));
+        if (features.heatmaps) {
           formData.append("generate_heatmaps", "true");
         }
 
@@ -356,50 +434,86 @@ const Home: React.FC = () => {
 
           {files.length > 0 && (
             <div className="mt-4 space-y-4">
-              <div className="relative group">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
-                <button
-                  onClick={() => setGenerateHeatmap(!generateHeatmap)}
-                  className={`relative flex items-center justify-between w-full p-4 bg-gray-900 border ${generateHeatmap ? "border-blue-500 bg-blue-500/10" : "border-gray-800"} rounded-lg transition-all duration-300 hover:border-blue-400 group`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`p-2 rounded-lg ${generateHeatmap ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400"} transition-colors duration-300`}
-                    >
-                      <Video className="w-6 h-6" />
-                    </div>
-                    <div className="text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">
-                          Generate Heatmap
-                        </span>
-                        <span className="px-2 py-0.5 text-[10px] font-black bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full uppercase">
-                          Takes Longer
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Visualise engagement hotspots using our proprietary AI
-                        models
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${generateHeatmap ? "bg-blue-600 border-blue-600" : "border-gray-600"}`}
-                  >
-                    {generateHeatmap && <Check className="w-4 h-4 text-white" />}
-                  </div>
-                </button>
-
-                <div className="absolute left-0 -top-12 w-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                  <div className="bg-blue-600 text-white text-[10px] px-3 py-2 rounded shadow-xl flex items-center gap-2">
-                    <span className="font-bold">
-                      Available on Portable version
-                    </span>
-                    <span>Air gapped | Stand alone | Edge</span>
-                  </div>
-                  <div className="w-3 h-3 bg-blue-600 rotate-45 mx-auto -mt-1.5"></div>
+              {featuresLoaded && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Detection options
+                  </p>
+                  {FEATURE_CATALOG.filter((def) => entitled[def.id]).map(
+                    (def) => {
+                      const on = selectedFeatures[def.id];
+                      const disabled =
+                        def.id === "gemini_heatmap_audit" &&
+                        !selectedFeatures.heatmaps;
+                      return (
+                        <div key={def.id} className="relative group">
+                          {def.id === "heatmaps" && (
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+                          )}
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => toggleFeature(def.id)}
+                            className={`relative flex items-center justify-between w-full p-4 bg-gray-900 border ${
+                              on
+                                ? "border-blue-500 bg-blue-500/10"
+                                : "border-gray-800"
+                            } rounded-lg transition-all duration-300 hover:border-blue-400 ${
+                              disabled
+                                ? "opacity-40 cursor-not-allowed hover:border-gray-800"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  on
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-800 text-gray-400"
+                                } transition-colors duration-300`}
+                              >
+                                {FEATURE_ICONS[def.id]}
+                              </div>
+                              <div className="text-left">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-bold text-white uppercase tracking-wider">
+                                    {def.label}
+                                  </span>
+                                  {def.badge && (
+                                    <span className="px-2 py-0.5 text-[10px] font-black bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full uppercase">
+                                      {def.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {disabled
+                                    ? "Enable Generate Heatmap to use heatmap audit"
+                                    : def.description}
+                                </p>
+                              </div>
+                            </div>
+                            <div
+                              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0 ${
+                                on
+                                  ? "bg-blue-600 border-blue-600"
+                                  : "border-gray-600"
+                              }`}
+                            >
+                              {on && <Check className="w-4 h-4 text-white" />}
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    }
+                  )}
+                  {FEATURE_CATALOG.every((def) => !entitled[def.id]) && (
+                    <p className="text-xs text-gray-500">
+                      No optional detection features on your plan. Upload will
+                      run base detection only.
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
 
               <ul
                 className={`space-y-2 rounded-lg border p-3 ${

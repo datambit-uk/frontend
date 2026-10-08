@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { motion } from 'framer-motion';
+import DevWatermark from './DevWatermark';
 
 interface VideoBackgroundProps {
   videoSrc: string;
@@ -40,14 +41,17 @@ const VideoBackground: React.FC<VideoBackgroundProps> = ({ videoSrc }) => {
       />
 
       <div className="relative z-10 flex flex-col items-center justify-center space-y-8 p-8 text-center">
-        <motion.img
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          src={import.meta.env.BASE_URL + 'datambit_logo.png'}
-          alt="Datambit logo"
-          className="w-96 h-auto"
-        />
+        <div className="relative">
+          <motion.img
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            src={import.meta.env.BASE_URL + 'datambit_logo.png'}
+            alt="Datambit logo"
+            className="w-96 h-auto"
+          />
+          <DevWatermark className="text-5xl px-4 py-2 border-4" />
+        </div>
         <div className="max-w-2xl space-y-4">
           <motion.h2
             initial={{ x: -50, opacity: 0 }}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, Check, AlertCircle } from "lucide-react";
 import { apiCall } from "../api/api";
+import DevWatermark from "../components/DevWatermark";
 
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -162,8 +163,9 @@ const PasswordReset: React.FC = () => {
           transition={{ duration: 0.3 }}
           className="bg-gray-900/90 backdrop-blur-lg rounded-lg shadow-2xl p-8 border border-gray-800"
         >
-          <div className="w-fit mx-auto mb-4">
+          <div className="relative w-fit mx-auto mb-4">
             <img src={import.meta.env.BASE_URL + 'datambit_logo.png'} alt="Datambit logo" className="h-20" />
+            <DevWatermark className="text-2xl px-3 py-1.5 border-[3px]" />
           </div>
           
           <motion.div

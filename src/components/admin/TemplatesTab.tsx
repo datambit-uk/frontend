@@ -9,6 +9,8 @@ const FEATURE_FIELDS: { key: keyof FormState; label: string }[] = [
   { key: 'audio_detection', label: 'Audio Detection' },
   { key: 'audio_transcription', label: 'Audio Transcription' },
   { key: 'reasoning', label: 'Reasoning' },
+  { key: 'heatmaps', label: 'Heatmaps' },
+  { key: 'gemini_heatmap_audit', label: 'Gemini Heatmap Audit' },
 ];
 
 const QUOTA_FIELDS: { key: keyof FormState; label: string }[] = [
@@ -25,6 +27,8 @@ interface FormState {
   audio_detection: boolean;
   audio_transcription: boolean;
   reasoning: boolean;
+  heatmaps: boolean;
+  gemini_heatmap_audit: boolean;
   max_file_size_mb: string;
   max_uploads_per_day: string;
   max_uploads_per_month: string;
@@ -34,6 +38,7 @@ const emptyForm: FormState = {
   name: '', description: '',
   video_model_1: false, video_model_2: false, audio_detection: false,
   audio_transcription: false, reasoning: false,
+  heatmaps: false, gemini_heatmap_audit: false,
   max_file_size_mb: '', max_uploads_per_day: '', max_uploads_per_month: '',
 };
 
@@ -73,6 +78,8 @@ const TemplatesTab: React.FC = () => {
         video_model_1: t.video_model_1, video_model_2: t.video_model_2,
         audio_detection: t.audio_detection, audio_transcription: t.audio_transcription,
         reasoning: t.reasoning,
+        heatmaps: t.heatmaps ?? false,
+        gemini_heatmap_audit: t.gemini_heatmap_audit ?? false,
         max_file_size_mb: t.max_file_size_mb?.toString() ?? '',
         max_uploads_per_day: t.max_uploads_per_day?.toString() ?? '',
         max_uploads_per_month: t.max_uploads_per_month?.toString() ?? '',
@@ -97,6 +104,8 @@ const TemplatesTab: React.FC = () => {
       audio_detection: form.audio_detection,
       audio_transcription: form.audio_transcription,
       reasoning: form.reasoning,
+      heatmaps: form.heatmaps,
+      gemini_heatmap_audit: form.gemini_heatmap_audit,
       max_file_size_mb: toNum(form.max_file_size_mb),
       max_uploads_per_day: toNum(form.max_uploads_per_day),
       max_uploads_per_month: toNum(form.max_uploads_per_month),

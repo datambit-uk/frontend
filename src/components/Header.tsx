@@ -4,6 +4,7 @@ import { User, Menu } from "lucide-react";
 import SearchBar from "./SearchBar";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthenticationContent";
+import DevWatermark from "./DevWatermark";
 
 interface HeaderProps {
   onSidebarToggle: () => void;
@@ -73,12 +74,13 @@ const Header: React.FC<HeaderProps> = ({ onSidebarToggle }) => {
         </button>
 
         {/* Logo - Only visible on mobile */}
-        <div className="md:hidden inline-block">
+        <div className="md:hidden relative inline-block">
           <img
             src={import.meta.env.BASE_URL + 'datambit_logo.png'}
             alt="Datambit Logo"
             className="h-8 w-auto"
           />
+          <DevWatermark className="text-xs px-1.5 py-0.5 border-2" />
         </div>
 
         {/* Search Section */}

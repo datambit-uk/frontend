@@ -16,17 +16,21 @@ describe('print section renderers', () => {
   it('renders video verdict, predicted class and class scores', () => {
     render(
       <PrintVideoSection
-        data={{
-          verdict: 'FAKE',
-          predictedClass: 'Face Manipulation',
-          fakePct: 99,
-          realPct: 1,
-          processingTime: 49.7,
-          framesAnalyzed: 32,
-          facesDetected: 1,
-          avgInferenceMs: 232.7,
-          classScores: [{ name: 'Fake', score: 0.9 }],
-        }}
+      data={{
+        verdict: 'FAKE',
+        predictedClass: 'Face Manipulation',
+        fakePct: 99,
+        realPct: 1,
+        processingTime: 49.7,
+        framesAnalyzed: 32,
+        facesDetected: 1,
+        avgInferenceMs: 232.7,
+        classScores: [{ name: 'Fake', score: 0.9 }],
+        heatmapFocusSummary: null,
+        attentionQuality: null,
+        heatmapAuditRationale: null,
+        heatmapAuditRisk: null,
+      }}
       />
     );
     expect(screen.getByText('FAKE')).toBeInTheDocument();
@@ -79,8 +83,8 @@ describe('print section renderers', () => {
     expect(screen.getByText('CLEAN')).toBeInTheDocument();
     expect(screen.getByText('unusual entropy')).toBeInTheDocument();
     expect(screen.getByText('HIGH_QUALITY')).toBeInTheDocument();
-    expect(screen.getByText('Gemini Forensic Signals')).toBeInTheDocument();
-    expect(screen.getByText('Gemini Synthesis')).toBeInTheDocument();
+    expect(screen.getByText('Key Findings')).toBeInTheDocument();
+    expect(screen.getByText('Synthesis')).toBeInTheDocument();
     expect(screen.getByText('looks clean')).toBeInTheDocument();
   });
 });

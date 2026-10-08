@@ -27,6 +27,8 @@ export interface TemplateDetail extends TemplateSummary {
   audio_detection: boolean;
   audio_transcription: boolean;
   reasoning: boolean;
+  heatmaps: boolean;
+  gemini_heatmap_audit: boolean;
   max_file_size_mb: number | null;
   max_uploads_per_day: number | null;
   max_uploads_per_month: number | null;

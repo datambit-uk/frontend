@@ -37,6 +37,10 @@ export interface NormalizedVideo {
   facesDetected: number | null;
   avgInferenceMs: number | null;
   classScores: { name: string; score: number }[];
+  heatmapFocusSummary: string | null;
+  attentionQuality: string | null;
+  heatmapAuditRationale: string | null;
+  heatmapAuditRisk: string | null;
   windows?: Array<{
     startSec: number;
     endSec: number;
@@ -97,7 +101,7 @@ export function normalizeImage(img: any): NormalizedImage {
   };
 }
 
-export function normalizeVideo(v: any): NormalizedVideo {
+export function normalizeVideo(v: any, geminiSummary?: any): NormalizedVideo {
   // Detector emits class_scores; class_confidences is the legacy / DB column name.
   const rawScores = v?.class_scores ?? v?.class_confidences;
   const classScores = rawScores
@@ -106,6 +110,29 @@ export function normalizeVideo(v: any): NormalizedVideo {
         score: Number(score),
       }))
     : [];
+  const gs = geminiSummary || {};
+  const focus =
+    gs.heatmap_focus_summary && gs.heatmap_focus_summary !== 'N/A'
+      ? String(gs.heatmap_focus_summary)
+      : null;
+  const attention =
+    gs.attention_quality &&
+    gs.attention_quality !== 'N/A' &&
+    gs.attention_quality !== 'NOT_AVAILABLE'
+      ? String(gs.attention_quality)
+      : null;
+  const audit = gs.heatmap_audit_verdict;
+  const auditRationale =
+    audit && typeof audit === 'object' && audit.rationale
+      ? String(audit.rationale)
+      : null;
+  const auditRisk =
+    audit &&
+    typeof audit === 'object' &&
+    audit.risk_level &&
+    audit.risk_level !== 'NOT_AVAILABLE'
+      ? String(audit.risk_level)
+      : null;
   return {
     verdict: String(v?.verdict || 'UNKNOWN').toUpperCase(),
     predictedClass: v?.predicted_class ? titleCase(v.predicted_class) : 'N/A',
@@ -116,6 +143,10 @@ export function normalizeVideo(v: any): NormalizedVideo {
     facesDetected: num(v?.faces_detected),
     avgInferenceMs: num(v?.avg_inference_ms),
     classScores,
+    heatmapFocusSummary: focus,
+    attentionQuality: attention,
+    heatmapAuditRationale: auditRationale,
+    heatmapAuditRisk: auditRisk,
     windows: Array.isArray(v?.windows)
       ? v.windows
           .filter((window: any) => Number.isFinite(Number(window?.start_sec)) && Number.isFinite(Number(window?.end_sec)))
@@ -168,14 +199,34 @@ export function normalizeAudio(a: any): NormalizedAudio {
       h.importance_score !== undefined && h.importance_score !== null
         ? Number(h.importance_score) * 100
         : null;
+    const rawLabel = h.importance_label != null ? String(h.importance_label).trim() : '';
+    const labelUpper = rawLabel.toUpperCase().replace(/\s+/g, '_');
+    const labelOk =
+      !!rawLabel &&
+      ![
+        'UNKNOWN',
+        'NEGLIGIBLE',
+        'UNKNOWN/NEGLIGIBLE',
+        'UNKNOWN_NEGLIGIBLE',
+        'N/A',
+        'NA',
+        'NONE',
+        'MISSING',
+        'NOT_AVAILABLE',
+        'NOTAVAILABLE',
+      ].includes(labelUpper);
+    const transcript =
+      typeof h.transcription === 'string' && h.transcription.trim()
+        ? h.transcription.trim()
+        : undefined;
     segments.push({
       startSec: Number(h.start_sec ?? 0),
       endSec: Number(h.end_sec ?? 0),
       verdict: String(h.verdict || defaultVerdict).toUpperCase(),
       rationale: h.importance_rationale || h.rationale,
-      transcription: h.transcription,
-      importanceLabel: h.importance_label || undefined,
-      importanceScorePct: importanceScore,
+      transcription: transcript,
+      importanceLabel: labelOk ? rawLabel : undefined,
+      importanceScorePct: Number.isFinite(importanceScore as number) ? importanceScore : null,
     });
   };
   pushSegment(highlights.primary_alert, 'FAKE');

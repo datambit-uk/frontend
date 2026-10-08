@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, LogOut, Clock, FolderOpen, BarChart3, Shield, LifeBuoy } from "lucide-react";
+import DevWatermark from "./DevWatermark";
 import { useAuth } from "../auth/AuthenticationContent";
 
 interface SidebarProps {
@@ -48,12 +49,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, logout }) => {
     >
       {/* Logo Section */}
       <div className="p-6 border-b border-gray-800/50">
-        <div className="flex items-center justify-center">
+        <div className="relative flex items-center justify-center">
           <img
             src={import.meta.env.BASE_URL + 'datambit_logo.png'}
             alt="Datambit Logo"
             className="w-full h-12 object-contain"
           />
+          <DevWatermark className="text-base px-2 py-1 border-2" />
         </div>
       </div>
 

@@ -160,6 +160,49 @@ interface Result {
   heatmap_url: string[] | null;
   heatmap_paths: string[] | null;
   metadata_analysis: any | null;
+  obvious_deepfake_analysis?: ObviousDeepfakeAnalysis | null;
+}
+
+interface ObviousDeepfakeAnalysis {
+  enabled?: boolean;
+  skipped?: boolean;
+  is_obvious_deepfake?: boolean;
+  verdict?: string;
+  confidence?: number;
+  rationale?: string;
+  reasons?: string[];
+  modality?: string;
+  frames_sampled?: number;
+  audio_included?: boolean;
+  processing_time_sec?: number;
+  model?: string;
+  note?: string;
+  error?: string;
+  used_multimodal?: boolean;
+  layer?: string;
+  windows_analyzed?: number;
+  windows_obvious?: number;
+  sampling?: {
+    mode?: string;
+    frames_per_window?: number;
+    window_sec?: number;
+    stride_sec?: number;
+    max_windows?: number;
+    windows_planned?: number;
+    windows_completed?: number;
+    early_stopped?: boolean;
+  };
+  windows?: Array<{
+    window_index?: number;
+    start_sec?: number;
+    end_sec?: number;
+    verdict?: string;
+    confidence?: number;
+    is_obvious_deepfake?: boolean;
+    rationale?: string;
+    reasons?: string[];
+    frames_sampled?: number;
+  }>;
 }
 
 interface FileUpload {
@@ -176,8 +219,194 @@ interface ReportDetailResponse {
   };
 }
 
-const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null; forceExpand?: boolean }> = ({ data: v, heatmapUrls, forceExpand }) => {
+/** Resolve obvious-deepfake payload from any of the nested JSONB homes. */
+const resolveObviousDeepfake = (result: Result | null | undefined): ObviousDeepfakeAnalysis | null => {
+  if (!result) return null;
+  const candidates = [
+    result.obvious_deepfake_analysis,
+    (result.video_analysis as any)?.obvious_deepfake_analysis,
+    (result.audio_analysis as any)?.obvious_deepfake_analysis,
+  ];
+  for (const c of candidates) {
+    if (!c || typeof c !== 'object') continue;
+    // Disabled / skipped precheck must not occupy a layout column.
+    if (c.skipped || String(c.verdict || '').toUpperCase() === 'SKIPPED') continue;
+    if (c.verdict || c.rationale || c.is_obvious_deepfake !== undefined) {
+      return c as ObviousDeepfakeAnalysis;
+    }
+  }
+  return null;
+};
+
+const ObviousDeepfakeSection: React.FC<{ data: ObviousDeepfakeAnalysis; forceExpand?: boolean }> = ({ data, forceExpand }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const showFull = isExpanded || forceExpand;
+
+  if (!data || data.skipped || data.verdict === 'SKIPPED') return null;
+
+  const verdict = String(data.verdict || 'UNKNOWN').toUpperCase();
+  const isObvious = !!data.is_obvious_deepfake || verdict === 'OBVIOUS_FAKE';
+  const notObvious = verdict === 'NOT_OBVIOUS';
+
+  const verdictStyle = isObvious
+    ? 'bg-red-900/40 text-red-400'
+    : notObvious
+      ? 'bg-green-900/40 text-green-400'
+      : 'bg-gray-800 text-gray-400';
+
+  const verdictLabel = isObvious
+    ? 'OBVIOUS FAKE'
+    : notObvious
+      ? 'NOT OBVIOUS'
+      : verdict;
+
+  const confidencePct = data.confidence != null && Number.isFinite(Number(data.confidence))
+    ? (Number(data.confidence) * 100).toFixed(2)
+    : null;
+
+  const summary = (data.rationale || '').trim();
+
+  return (
+    <div className="min-h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
+      <div className="flex justify-between items-center mb-2">
+        <div>
+          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+            Perceptual Visual Screening
+          </h4>
+          <p className="text-[9px] text-gray-500 mt-0.5 normal-case tracking-normal font-normal">
+            Initial perceptual check for glaring visual and temporal anomalies.
+          </p>
+        </div>
+        {!forceExpand && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-[10px] bg-gray-800 hover:bg-gray-700 text-blue-400 px-2 py-1 rounded border border-gray-700 transition-all flex items-center gap-1 no-print shrink-0"
+          >
+            {isExpanded ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Hide
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                Show Full Analysis
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-black px-2 py-0.5 rounded ${verdictStyle}`}>
+            {verdictLabel}
+          </span>
+        </div>
+
+        <div className="space-y-1 text-[10px] text-gray-400">
+          {confidencePct != null && (
+            <p>Confidence: <span className="text-gray-300">{confidencePct}%</span></p>
+          )}
+          {summary && (
+            <p className="text-gray-300 leading-snug whitespace-normal break-words">{summary}</p>
+          )}
+          {data.windows_analyzed != null && (
+            <p>
+              Windows analyzed:{' '}
+              <span className="text-gray-300">{data.windows_analyzed}</span>
+              {data.sampling?.frames_per_window != null && data.sampling?.window_sec != null && (
+                <span className="opacity-70">
+                  {' '}({data.sampling.frames_per_window} frames / {data.sampling.window_sec}s)
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+
+        {showFull && (
+          <motion.div
+            initial={forceExpand ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={forceExpand ? { duration: 0 } : { duration: 0.3 }}
+            className="mt-4 space-y-2 pt-3 border-t border-gray-700/50 text-[10px] text-gray-500"
+          >
+            {Array.isArray(data.reasons) && data.reasons.length > 0 && (
+              <div>
+                <p className="font-black text-gray-500 uppercase mb-1 text-[9px]">Reasons</p>
+                <ul className="list-disc list-inside space-y-0.5 text-gray-300">
+                  {data.reasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {data.sampling && (
+              <p>
+                Sampling:{' '}
+                <span className="text-gray-300">
+                  {data.sampling.frames_per_window ?? '?'} frames / {data.sampling.window_sec ?? '?'}s window
+                  {data.sampling.early_stopped ? ' · early exit' : ''}
+                </span>
+              </p>
+            )}
+            {data.modality && (
+              <p>Modality: <span className="text-gray-300">{data.modality}</span></p>
+            )}
+            {data.frames_sampled != null && (
+              <p>Frames sampled: <span className="text-gray-300">{data.frames_sampled}</span></p>
+            )}
+            {data.audio_included != null && (
+              <p>Audio included: <span className="text-gray-300">{data.audio_included ? 'yes' : 'no'}</span></p>
+            )}
+            {data.processing_time_sec != null && (
+              <p>Screening time: <span className="text-gray-300">{Number(data.processing_time_sec).toFixed(2)}s</span></p>
+            )}
+            {Array.isArray(data.windows) && data.windows.length > 0 && (
+              <div className="mt-1 space-y-1">
+                <p className="font-black text-gray-500 uppercase text-[9px]">Per-window opinions</p>
+                {data.windows.map((w, i) => (
+                  <div key={i} className="bg-black/20 p-1.5 rounded text-gray-400">
+                    <span className="text-gray-300">
+                      {Number(w.start_sec ?? 0).toFixed(1)}s–{Number(w.end_sec ?? 0).toFixed(1)}s
+                    </span>
+                    {' · '}
+                    <span className={w.is_obvious_deepfake ? 'text-red-400' : 'text-gray-300'}>
+                      {w.verdict || 'UNKNOWN'}
+                    </span>
+                    {w.confidence != null && (
+                      <span className="opacity-70"> ({(Number(w.confidence) * 100).toFixed(0)}%)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.error && (
+              <p className="text-red-400">Error: {data.error}</p>
+            )}
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const VideoAnalysisSection: React.FC<{
+  data: any;
+  heatmapUrls?: string[] | null;
+  heatmapAudit?: {
+    focusSummary?: string | null;
+    attentionQuality?: string | null;
+    auditVerdict?: { error_risk_type?: string; risk_level?: string; rationale?: string } | null;
+  } | null;
+  forceExpand?: boolean;
+}> = ({ data: v, heatmapUrls, heatmapAudit, forceExpand }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showHeatmapAudit, setShowHeatmapAudit] = useState(false);
   const showFull = isExpanded || forceExpand;
 
   if (!v) return null;
@@ -199,10 +428,31 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
     return type === 'real' ? 'text-green-300' : 'text-red-300';
   };
 
+  const focusSummary =
+    heatmapAudit?.focusSummary && heatmapAudit.focusSummary !== 'N/A'
+      ? String(heatmapAudit.focusSummary)
+      : null;
+  const attentionQuality =
+    heatmapAudit?.attentionQuality &&
+    heatmapAudit.attentionQuality !== 'N/A' &&
+    heatmapAudit.attentionQuality !== 'NOT_AVAILABLE'
+      ? String(heatmapAudit.attentionQuality)
+      : null;
+  const auditRationale =
+    heatmapAudit?.auditVerdict?.rationale && String(heatmapAudit.auditVerdict.rationale).trim()
+      ? String(heatmapAudit.auditVerdict.rationale)
+      : null;
+  const auditRisk =
+    heatmapAudit?.auditVerdict?.risk_level &&
+    heatmapAudit.auditVerdict.risk_level !== 'NOT_AVAILABLE'
+      ? String(heatmapAudit.auditVerdict.risk_level)
+      : null;
+  const hasHeatmapAudit = !!(focusSummary || attentionQuality || auditRationale);
+
   return (
     <div className="min-h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
       <div className="flex justify-between items-center mb-2">
-        <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Video Analysis</h4>
+        <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider">Video Forensic Analysis</h4>
         {!forceExpand && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
@@ -281,6 +531,33 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
           aggregations={v.aggregations || v.aggregation_results}
           activeMethod={v.fusion_diagnostics?.method}
         />
+
+        {hasHeatmapAudit && (
+          <div className="mt-2 p-2 bg-orange-900/10 border border-orange-500/20 rounded-lg space-y-1.5">
+            <p className="text-[9px] font-black text-orange-300 uppercase tracking-wider">Heatmap Analysis</p>
+            {attentionQuality && (
+              <p className="text-[10px] text-gray-400">
+                Attention: <span className="text-orange-200 font-medium">{attentionQuality}</span>
+                {auditRisk ? <span className="opacity-70"> · Risk {auditRisk}</span> : null}
+              </p>
+            )}
+            {focusSummary && (
+              <p className="text-[10px] text-gray-300 leading-snug">{focusSummary}</p>
+            )}
+            {auditRationale && (showFull || showHeatmapAudit) && (
+              <p className="text-[10px] text-gray-400 leading-snug italic">{auditRationale}</p>
+            )}
+            {auditRationale && !showFull && !showHeatmapAudit && (
+              <button
+                type="button"
+                onClick={() => setShowHeatmapAudit(true)}
+                className="text-[9px] text-blue-400 hover:text-blue-300 no-print text-left"
+              >
+                Show full heatmap audit rationale…
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {heatmapUrls && heatmapUrls.length > 0 && (
@@ -320,6 +597,26 @@ const VideoAnalysisSection: React.FC<{ data: any; heatmapUrls?: string[] | null;
           )}
         </motion.div>
       )}
+    </div>
+  );
+};
+
+const ForensicExplanationBlock: React.FC<{
+  explanation: string;
+}> = ({ explanation }) => {
+  const text = String(explanation || '').trim();
+  if (!text || text === 'N/A') return null;
+
+  return (
+    <div className="w-full p-4 border border-blue-500/30 rounded-lg bg-blue-900/10 backdrop-blur-sm print-break-inside-avoid">
+      <div className="mb-2">
+        <span className="text-[10px] font-black text-blue-300 uppercase tracking-wider">
+          Full Evidence Explanation
+        </span>
+      </div>
+      <p className="text-[11px] text-gray-300 leading-relaxed whitespace-pre-wrap">
+        {text}
+      </p>
     </div>
   );
 };
@@ -420,15 +717,26 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
             </svg>
           </div>
-          <span className="text-[9px] font-black text-blue-300 uppercase tracking-wider">AI Forensic Insights</span>
+          <span className="text-[9px] font-black text-blue-300 uppercase tracking-wider">Evidence Collation</span>
           <span className={`ml-auto text-[8px] font-bold px-1 rounded ${geminiSummary.verdict === 'MANIPULATED' ? 'text-red-400 bg-red-950/40' : 'text-green-400 bg-green-950/40'}`}>
             {geminiSummary.verdict} ({(geminiSummary.confidence * 100).toFixed(0)}%)
           </span>
         </div>
-        {/* Show more text by default - increased line-clamp */}
-        <p className="text-[10px] text-gray-300 leading-tight line-clamp-4 italic print:line-clamp-none">
-          "{geminiSummary.forensic_trail_explanation}"
-        </p>
+        {geminiSummary.key_findings && geminiSummary.key_findings.length > 0 && (
+          <ul className="space-y-1">
+            {geminiSummary.key_findings.slice(0, showFull ? undefined : 2).map((finding: string, i: number) => (
+              <li key={i} className="text-[10px] text-gray-300 flex gap-2 leading-snug">
+                <span className="text-blue-500 font-bold">•</span>
+                {finding}
+              </li>
+            ))}
+            {!showFull && geminiSummary.key_findings.length > 2 && (
+              <li className="list-none text-blue-400 text-[9px] font-medium no-print">
+                + {geminiSummary.key_findings.length - 2} more in full analysis…
+              </li>
+            )}
+          </ul>
+        )}
       </div>
     )}
 
@@ -459,7 +767,7 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
       >
       {geminiSummary && (
         <div className="bg-blue-900/10 p-3 rounded-lg border border-blue-500/20">
-          <p className="text-[10px] font-black text-blue-300 uppercase mb-2 border-b border-blue-500/30 pb-1">Detailed Forensic Report</p>
+          <p className="text-[10px] font-black text-blue-300 uppercase mb-2 border-b border-blue-500/30 pb-1">Evidence Collation</p>
           
           {geminiSummary.key_findings && geminiSummary.key_findings.length > 0 && (
             <div className="mb-3">
@@ -475,7 +783,7 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="grid grid-cols-2 gap-2">
             {geminiSummary.fps_summary && geminiSummary.fps_summary !== 'N/A' && (
               <div className="bg-black/30 p-1.5 rounded">
                 <p className="text-[8px] text-gray-500 uppercase font-bold">FPS Summary</p>
@@ -506,13 +814,6 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
                 <p className="text-[10px] text-blue-200">{geminiSummary.neural_metadata_alignment}</p>
               </div>
             )}
-          </div>
-
-          <div>
-            <p className="text-[9px] font-black text-gray-500 uppercase mb-1">Full Explanation</p>
-            <p className="text-[10px] text-gray-400 leading-relaxed bg-black/40 p-2 rounded border border-gray-800/50 italic">
-              {geminiSummary.forensic_trail_explanation}
-            </p>
           </div>
         </div>
       )}
@@ -632,6 +933,39 @@ const MetadataSection: React.FC<{ data: any; forceExpand?: boolean }> = ({ data:
   );
 };
 
+const isPlaceholderImportanceLabel = (label: unknown): boolean => {
+  if (label == null) return true;
+  const s = String(label).trim();
+  if (!s) return true;
+  const upper = s.toUpperCase().replace(/\s+/g, '_');
+  return [
+    'UNKNOWN',
+    'NEGLIGIBLE',
+    'UNKNOWN/NEGLIGIBLE',
+    'UNKNOWN_NEGLIGIBLE',
+    'N/A',
+    'NA',
+    'NONE',
+    'MISSING',
+    'NOT_AVAILABLE',
+    'NOTAVAILABLE',
+  ].includes(upper);
+};
+
+const hasAudioImportance = (item: any): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const hasLabel = !isPlaceholderImportanceLabel(item.importance_label);
+  const score = item.importance_score;
+  const hasScore = score !== undefined && score !== null && Number.isFinite(Number(score));
+  return hasLabel || hasScore;
+};
+
+const hasAudioTranscription = (item: any): boolean =>
+  typeof item?.transcription === 'string' && item.transcription.trim().length > 0;
+
+const hasAudioImportanceRationale = (item: any): boolean =>
+  typeof item?.importance_rationale === 'string' && item.importance_rationale.trim().length > 0;
+
 const SuspiciousChunksTimeline: React.FC<{ 
   audioWindows?: AudioWindow[];
   highlights?: AudioHighlights;
@@ -651,7 +985,9 @@ const SuspiciousChunksTimeline: React.FC<{
   const technical = highlights?.technical_proof;
   const primaryImportanceLabel = String((primary as any)?.importance_label || "").toUpperCase();
   const primaryIsFake = String((primary as any)?.verdict || "").toUpperCase() === "FAKE";
-  const primaryRequiresImmediateReview = Boolean(primary && primaryIsFake && primaryImportanceLabel === "CRITICAL");
+  const primaryRequiresImmediateReview = Boolean(
+    primary && primaryIsFake && !isPlaceholderImportanceLabel(primaryImportanceLabel) && primaryImportanceLabel === "CRITICAL"
+  );
   const displayedRealInsights = (showAllRealInsights || forceExpand) ? (realInsights || []) : (realInsights || []).slice(0, 1);
 
   return (
@@ -681,24 +1017,30 @@ const SuspiciousChunksTimeline: React.FC<{
             )}
           </p>
 
-          <div className="flex items-center gap-2 text-[10px] mt-1">
-            <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
-            <span className="text-red-300 font-semibold">{(primary as any).importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
-            {(primary as any).importance_score !== undefined && (
-              <span className="text-gray-400">
-                Score: {(Number((primary as any).importance_score) * 100).toFixed(1)}%
-              </span>
-            )}
-          </div>
-
-          {(primary as any).transcription && (
-            <div className="mt-1">
-              <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
-              <p className="text-[10px] text-gray-400 mt-1 italic">"{(primary as any).transcription}"</p>
+          {hasAudioImportance(primary) && (
+            <div className="flex items-center gap-2 text-[10px] mt-1">
+              <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
+              {!isPlaceholderImportanceLabel((primary as any).importance_label) && (
+                <span className="text-red-300 font-semibold">{(primary as any).importance_label}</span>
+              )}
+              {(primary as any).importance_score !== undefined &&
+                (primary as any).importance_score !== null &&
+                Number.isFinite(Number((primary as any).importance_score)) && (
+                <span className="text-gray-400">
+                  Score: {(Number((primary as any).importance_score) * 100).toFixed(1)}%
+                </span>
+              )}
             </div>
           )}
 
-          {(primary as any).importance_rationale && (
+          {hasAudioTranscription(primary) && (
+            <div className="mt-1">
+              <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
+              <p className="text-[10px] text-gray-400 mt-1 italic">"{String((primary as any).transcription).trim()}"</p>
+            </div>
+          )}
+
+          {hasAudioImportanceRationale(primary) && (
             <div className="mt-1">
               <p className="text-[9px] font-black text-gray-500 uppercase">Rationale</p>
               <p className="text-[10px] text-gray-400 mt-1">{(primary as any).importance_rationale}</p>
@@ -744,22 +1086,28 @@ const SuspiciousChunksTimeline: React.FC<{
                   {formatTime(insight.start_sec)} → {formatTime(insight.end_sec)}
                 </p>
 
-                <div className="flex items-center gap-2 text-[10px] mb-1">
-                  <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
-                  <span className="text-green-300 font-semibold">{insight.importance_label || 'UNKNOWN/NEGLIGIBLE'}</span>
-                  {insight.importance_score !== undefined && (
-                    <span className="text-gray-400">Score: {(insight.importance_score * 100).toFixed(1)}%</span>
-                  )}
-                </div>
-
-                {insight.transcription && (
-                  <div className="mb-1">
-                    <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
-                    <p className="text-gray-400 italic mt-0.5">"{insight.transcription}"</p>
+                {hasAudioImportance(insight) && (
+                  <div className="flex items-center gap-2 text-[10px] mb-1">
+                    <p className="text-[9px] font-black text-gray-500 uppercase">Importance</p>
+                    {!isPlaceholderImportanceLabel(insight.importance_label) && (
+                      <span className="text-green-300 font-semibold">{insight.importance_label}</span>
+                    )}
+                    {insight.importance_score !== undefined &&
+                      insight.importance_score !== null &&
+                      Number.isFinite(Number(insight.importance_score)) && (
+                      <span className="text-gray-400">Score: {(Number(insight.importance_score) * 100).toFixed(1)}%</span>
+                    )}
                   </div>
                 )}
 
-                {insight.importance_rationale && (
+                {hasAudioTranscription(insight) && (
+                  <div className="mb-1">
+                    <p className="text-[9px] font-black text-gray-500 uppercase">Transcript</p>
+                    <p className="text-gray-400 italic mt-0.5">"{String(insight.transcription).trim()}"</p>
+                  </div>
+                )}
+
+                {hasAudioImportanceRationale(insight) && (
                   <div>
                     <p className="text-[9px] font-black text-gray-500 uppercase">Rationale</p>
                     <p className="text-gray-400 text-[9px] mt-0.5">{insight.importance_rationale}</p>
@@ -1052,11 +1400,17 @@ const ReportDetail: React.FC = () => {
           ...(upload.result!.heatmap_url || []),
           ...(upload.result!.heatmap_paths || []),
         ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+        const gs = upload.result?.metadata_analysis?.gemini_summary;
         videoBlock = (
           <div key="video-analysis" className="min-h-full">
             <VideoAnalysisSection 
               data={upload.result!.video_analysis} 
               heatmapUrls={heatmapUrls}
+              heatmapAudit={gs ? {
+                focusSummary: gs.heatmap_focus_summary,
+                attentionQuality: gs.attention_quality,
+                auditVerdict: gs.heatmap_audit_verdict,
+              } : null}
               forceExpand={forceExpand} 
             />
           </div>
@@ -1081,7 +1435,7 @@ const ReportDetail: React.FC = () => {
         audioBlock = (
           <div key="audio-analysis" className="min-h-full p-3 border border-gray-700/50 rounded-lg bg-gray-900/30 backdrop-blur-sm print-break-inside-avoid">
             <div className="flex justify-between items-center mb-2">
-              <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Audio Analysis</h4>
+              <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Audio Forensic Analysis</h4>
             </div>
 
             <div className="space-y-2">
@@ -1142,21 +1496,39 @@ const ReportDetail: React.FC = () => {
       }
 
       const hasMetadata = !!upload.result?.metadata_analysis;
+      const obviousData = resolveObviousDeepfake(upload.result);
+      const showPerceptual = !!obviousData;
+      const gridClass = showPerceptual
+        ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6'
+        : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6';
+      const geminiSummary = upload.result?.metadata_analysis?.gemini_summary;
+      const forensicExplanation =
+        geminiSummary?.forensic_trail_explanation &&
+        geminiSummary.forensic_trail_explanation !== 'N/A'
+          ? String(geminiSummary.forensic_trail_explanation)
+          : null;
 
       return (
-        <div className="flex flex-col gap-6">
-
-        {/* Main layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {videoBlock}
-        {audioBlock}
-        {hasMetadata && (
-          <div className="min-h-full">
-          <MetadataSection data={upload.result!.metadata_analysis} forceExpand={forceExpand} />
+        <div className="flex flex-col gap-6 w-full">
+          {forensicExplanation && (
+            <ForensicExplanationBlock
+              explanation={forensicExplanation}
+            />
+          )}
+          <div className={gridClass}>
+            {showPerceptual && (
+              <div key="perceptual-screening" className="min-h-full">
+                <ObviousDeepfakeSection data={obviousData!} forceExpand={forceExpand} />
+              </div>
+            )}
+            {videoBlock}
+            {audioBlock}
+            {hasMetadata && (
+              <div key="metadata-analysis" className="min-h-full">
+                <MetadataSection data={upload.result!.metadata_analysis} forceExpand={forceExpand} />
+              </div>
+            )}
           </div>
-        )}
-        </div>
-
         </div>
       );
     }

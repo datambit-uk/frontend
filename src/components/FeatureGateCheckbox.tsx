@@ -43,8 +43,10 @@ const FeatureGateCheckbox: React.FC<FeatureGateCheckboxProps> = ({
           jwtToken: true
         });
 
-        const data = response as PermissionCheckResponse;
-        setAllowed(data.allowed);
+        const data =
+          (response?.message as PermissionCheckResponse | undefined) ??
+          (response as PermissionCheckResponse);
+        setAllowed(Boolean(data.allowed));
 
         if (!data.allowed && data.reason) {
           setReason(data.reason as DenialReason);

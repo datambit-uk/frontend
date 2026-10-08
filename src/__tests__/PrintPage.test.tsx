@@ -22,8 +22,8 @@ describe('PrintPage', () => {
     render(<PrintPage file={videoFile} uploadId="abc123" />);
     expect(screen.getByText('clip.mp4')).toBeInTheDocument();
     expect(screen.getByText('abc123')).toBeInTheDocument();
-    expect(screen.getByText('Video Analysis')).toBeInTheDocument();
-    expect(screen.getByText('Audio Analysis')).toBeInTheDocument();
+    expect(screen.getByText('Video Forensic Analysis')).toBeInTheDocument();
+    expect(screen.getByText('Audio Forensic Analysis')).toBeInTheDocument();
     expect(screen.getByText('Metadata Analysis')).toBeInTheDocument();
     expect(screen.queryByTestId('report-headline')).not.toBeInTheDocument();
   });
@@ -31,7 +31,7 @@ describe('PrintPage', () => {
   it('renders only the image section for an image file', () => {
     render(<PrintPage file={imageFile} uploadId="img1" />);
     expect(screen.getByText('Image Analysis')).toBeInTheDocument();
-    expect(screen.queryByText('Video Analysis')).not.toBeInTheDocument();
-    expect(screen.queryByText('Audio Analysis')).not.toBeInTheDocument();
+    expect(screen.queryByText('Video Forensic Analysis')).not.toBeInTheDocument();
+    expect(screen.queryByText('Audio Forensic Analysis')).not.toBeInTheDocument();
   });
 });

@@ -61,10 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const checkToken = async () => {
+    // Network /users/me only on login, storage/auth events, tab focus, and
+    // after a successful token refresh — not on a 60s timer. Minute polling
+    // burned the shared Flask rate-limit budget (and OPTIONS preflights).
+    const syncSession = async (opts: { fetchAdmin: boolean }) => {
       const currentToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
       const currentRefreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
-      
+
       setToken(currentToken);
       setRefreshToken(currentRefreshToken);
 
@@ -75,30 +78,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const newToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
             setToken(newToken);
             setIsAuthenticated(!!newToken);
-            await refreshAdminStatus();
+            if (opts.fetchAdmin) {
+              await refreshAdminStatus();
+            }
             return;
           }
         }
         logout();
       } else if (currentToken) {
         setIsAuthenticated(true);
-        await refreshAdminStatus();
+        if (opts.fetchAdmin) {
+          await refreshAdminStatus();
+        }
       } else {
         setIsAuthenticated(false);
         setIsAdmin(null);
       }
     };
 
-    checkToken();
+    void syncSession({ fetchAdmin: true });
 
-    window.addEventListener('auth-change', checkToken);
-    window.addEventListener('storage', checkToken);
+    const onAuthChange = () => void syncSession({ fetchAdmin: true });
+    const onFocus = () => void syncSession({ fetchAdmin: true });
+    // Expiry-only tick: refresh JWT if needed; skip /users/me unless we refreshed.
+    const onTick = async () => {
+      const currentToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
+      const currentRefreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+      if (!currentToken || !isTokenExpired(currentToken)) {
+        return;
+      }
+      if (currentRefreshToken) {
+        const refreshed = await refreshAuthToken();
+        if (refreshed) {
+          const newToken = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
+          setToken(newToken);
+          setIsAuthenticated(!!newToken);
+          await refreshAdminStatus();
+          return;
+        }
+      }
+      logout();
+    };
 
-    // Check every minute
-    const interval = setInterval(checkToken, 60000);
+    window.addEventListener('auth-change', onAuthChange);
+    window.addEventListener('storage', onAuthChange);
+    window.addEventListener('focus', onFocus);
+    const interval = setInterval(onTick, 5 * 60 * 1000);
     return () => {
-      window.removeEventListener('auth-change', checkToken);
-      window.removeEventListener('storage', checkToken);
+      window.removeEventListener('auth-change', onAuthChange);
+      window.removeEventListener('storage', onAuthChange);
+      window.removeEventListener('focus', onFocus);
       clearInterval(interval);
     };
   }, [logout, refreshAdminStatus]);

@@ -19,6 +19,8 @@ jest.mock('lucide-react', () => ({
   LifeBuoy: () => <svg />,
 }));
 
+jest.mock('../components/DevWatermark', () => () => null);
+
 beforeEach(() => {
   mockUseAuth.mockReset();
 });
