@@ -48,6 +48,13 @@ export interface NormalizedVideo {
     confidence: number;
   }>;
   aggregations?: Array<{ method: string; label: string; verdict: string; fakePct: number; explanation: string }>;
+  scenes?: Array<{
+    startSec: number;
+    endSec: number;
+    verdict: string;
+    fakePct: number;
+    predictedClass: string;
+  }>;
 }
 
 export interface NormalizedAudio {
@@ -176,6 +183,17 @@ export function normalizeVideo(v: any, geminiSummary?: any): NormalizedVideo {
               explanation: method.explanation,
             };
           })
+      : [],
+    scenes: Array.isArray(v?.scenes)
+      ? v.scenes
+          .filter((scene: any) => Number.isFinite(Number(scene?.start_sec)) && Number.isFinite(Number(scene?.end_sec)))
+          .map((scene: any) => ({
+            startSec: Number(scene.start_sec),
+            endSec: Number(scene.end_sec),
+            verdict: String(scene.verdict || 'UNKNOWN').toUpperCase(),
+            fakePct: Number(scene.fake_confidence ?? 0) * 100,
+            predictedClass: scene.predicted_class ? titleCase(scene.predicted_class) : 'N/A',
+          }))
       : [],
   };
 }

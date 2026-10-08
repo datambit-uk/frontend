@@ -133,6 +133,20 @@ export const PrintVideoSection: React.FC<{ data: NormalizedVideo }> = ({ data })
         ))}
       </div>
     )}
+    {Array.isArray(data.scenes) && data.scenes.length > 0 && (
+      <div style={{ marginTop: 6 }}>
+        <p style={{ fontSize: 9, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', margin: '0 0 3px' }}>
+          Scenes
+        </p>
+        {data.scenes.map((scene) => (
+          <Row
+            key={`${scene.startSec}-${scene.endSec}`}
+            label={`${Math.floor(scene.startSec / 60)}:${Math.floor(scene.startSec % 60).toString().padStart(2, '0')}–${Math.floor(scene.endSec / 60)}:${Math.floor(scene.endSec % 60).toString().padStart(2, '0')}`}
+            value={`${scene.verdict} ${scene.fakePct.toFixed(1)}% · ${scene.predictedClass}`}
+          />
+        ))}
+      </div>
+    )}
     {data.classScores.length > 0 && (
       <div style={{ marginTop: 6 }}>
         <p style={{ fontSize: 9, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', margin: '0 0 3px' }}>

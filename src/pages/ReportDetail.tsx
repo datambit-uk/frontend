@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 import { PrintableReport } from './report/PrintableReport';
-import { VideoWindowTimeline } from './report/VideoWindowTimeline';
+import { VideoWindowTimeline, formatTimeSec } from './report/VideoWindowTimeline';
 import {
   collectHeatmapUrls,
   downloadHeatmapFiles,
@@ -531,6 +531,29 @@ const VideoAnalysisSection: React.FC<{
           aggregations={v.aggregations || v.aggregation_results}
           activeMethod={v.fusion_diagnostics?.method}
         />
+
+        {Array.isArray(v.scenes) && v.scenes.length > 0 && (
+          <div className="mt-2">
+            <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Scenes</p>
+            <div className="space-y-1">
+              {v.scenes.map((scene: any, index: number) => {
+                const verdict = String(scene.verdict || 'UNKNOWN').toUpperCase();
+                const fake = verdict === 'FAKE';
+                return (
+                  <div key={`${scene.start_sec}-${index}`} className="flex items-center justify-between bg-black/20 px-1.5 py-1 rounded text-[10px]">
+                    <span className="text-gray-300 font-mono">
+                      {formatTimeSec(scene.start_sec)}–{formatTimeSec(scene.end_sec)}
+                    </span>
+                    <span className="text-gray-400">{formatClassName(scene.predicted_class)}</span>
+                    <span className={fake ? 'text-red-300' : 'text-green-300'}>
+                      {verdict} {(Number(scene.fake_confidence || 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {hasHeatmapAudit && (
           <div className="mt-2 p-2 bg-orange-900/10 border border-orange-500/20 rounded-lg space-y-1.5">

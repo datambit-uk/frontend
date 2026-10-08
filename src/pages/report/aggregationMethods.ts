@@ -10,7 +10,7 @@ export const REPORT_AGGREGATIONS: AggregationMethodCopy[] = [
     id: 'persistent_peak_run',
     label: 'Peak run',
     explanation:
-      'Consecutive windows that stay suspicious count as one burst. The score follows the strongest burst, rises when that pattern covers more of the video, and drops when the high scores are isolated spikes.',
+      'Consecutive windows that stay suspicious count as one burst. A short burst is called fake only when it is highly confident. A milder burst is called fake when it covers a substantial part of the video.',
   },
   {
     id: 'max_fake_confidence',

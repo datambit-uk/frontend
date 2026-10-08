@@ -77,6 +77,9 @@ describe('reportNormalize', () => {
         max_confidence: { verdict: 'REAL', fake_confidence: 0.1 },
         min_confidence: { verdict: 'REAL', fake_confidence: 0.05 },
       },
+      scenes: [
+        { start_sec: 0, end_sec: 4.2, verdict: 'FAKE', fake_confidence: 0.81, predicted_class: 'lip_sync' },
+      ],
     });
     expect(r.windows).toEqual([
       { startSec: 0, endSec: 2.5, verdict: 'REAL', confidence: 0.9 },
@@ -87,6 +90,9 @@ describe('reportNormalize', () => {
       'Max fake',
       'Dual branch',
       'Majority vote',
+    ]);
+    expect(r.scenes).toEqual([
+      { startSec: 0, endSec: 4.2, verdict: 'FAKE', fakePct: 81, predictedClass: 'Lip Sync' },
     ]);
   });
 
