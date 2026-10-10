@@ -10,7 +10,7 @@ export const REPORT_AGGREGATIONS: AggregationMethodCopy[] = [
     id: 'persistent_peak_run',
     label: 'Peak run',
     explanation:
-      'Consecutive windows that stay suspicious count as one burst. A short burst is called fake only when it is highly confident. A milder burst is called fake when it covers a substantial part of the video.',
+      'A one-window spike is trusted in a short clip and discounted as the clip gets longer. A suspicious stretch of a few windows keeps its score. One fake window in a two-window clip is enough to call the video fake.',
   },
   {
     id: 'max_fake_confidence',
