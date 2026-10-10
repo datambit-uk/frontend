@@ -108,9 +108,47 @@ export function normalizeImage(img: any): NormalizedImage {
   };
 }
 
+/** Mean of each window's class scores. Falls back to the fused scores when windows have none. */
+export function averageWindowClassScores(
+  windows: unknown,
+  fallback?: Record<string, number> | null,
+): Record<string, number> | null {
+  const rows = Array.isArray(windows)
+    ? windows.filter((window) => {
+        if (!window || typeof window !== 'object') return false;
+        const scores = (window as { class_scores?: unknown }).class_scores;
+        return !!scores && typeof scores === 'object';
+      })
+    : [];
+  if (rows.length === 0) {
+    return fallback && typeof fallback === 'object' ? fallback : null;
+  }
+  const totals: Record<string, number> = {};
+  for (const window of rows) {
+    const scores = (window as { class_scores: Record<string, unknown> }).class_scores;
+    for (const [name, score] of Object.entries(scores)) {
+      const value = Number(score);
+      if (!Number.isFinite(value)) continue;
+      totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  const names = Object.keys(totals);
+  if (names.length === 0) {
+    return fallback && typeof fallback === 'object' ? fallback : null;
+  }
+  const averaged: Record<string, number> = {};
+  for (const name of names) {
+    averaged[name] = totals[name] / rows.length;
+  }
+  return averaged;
+}
+
 export function normalizeVideo(v: any, geminiSummary?: any): NormalizedVideo {
-  // Detector emits class_scores; class_confidences is the legacy / DB column name.
-  const rawScores = v?.class_scores ?? v?.class_confidences;
+  // Bars are the mean of every window. Fused class_scores is the fallback for older reports.
+  const rawScores = averageWindowClassScores(
+    v?.windows ?? v?.window_predictions,
+    v?.class_scores ?? v?.class_confidences,
+  );
   const classScores = rawScores
     ? Object.entries(rawScores).map(([name, score]) => ({
         name: titleCase(name),

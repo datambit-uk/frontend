@@ -4,6 +4,7 @@ import { apiCall } from "../api/api";
 import { motion } from 'framer-motion';
 import { PrintableReport } from './report/PrintableReport';
 import { VideoWindowTimeline, formatTimeSec } from './report/VideoWindowTimeline';
+import { averageWindowClassScores } from './report/reportNormalize';
 import {
   collectHeatmapUrls,
   downloadHeatmapFiles,
@@ -411,6 +412,11 @@ const VideoAnalysisSection: React.FC<{
 
   if (!v) return null;
 
+  const classScores = averageWindowClassScores(
+    v.windows || v.window_predictions,
+    v.class_scores || v.class_confidences,
+  );
+
   // Simple formatters
   const formatClassName = (cls: any) => {
     if (!cls) return 'N/A';
@@ -500,12 +506,12 @@ const VideoAnalysisSection: React.FC<{
           )}
         </div>
 
-        {/* Class Scores (class_scores from detector; class_confidences is legacy) */}
-        {(v.class_scores || v.class_confidences) && (
+        {/* Mean of every window's class scores. Fused scores are the fallback. */}
+        {classScores && (
           <div className="mt-2">
             <p className="font-black text-gray-500 uppercase mb-2 text-[9px]">Class Scores</p>
             <div className="space-y-1 text-[10px]">
-              {Object.entries(v.class_scores || v.class_confidences || {}).map(([className, score]: [string, any]) => {
+              {Object.entries(classScores).map(([className, score]: [string, any]) => {
                 const value = Number(score);
                 return (
                   <div key={className} className="flex justify-between items-center bg-black/20 p-1.5 rounded">

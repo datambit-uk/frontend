@@ -62,6 +62,42 @@ describe('reportNormalize', () => {
     ]);
   });
 
+  it('normalizeVideo averages class scores across every window', () => {
+    const r = normalizeVideo({
+      verdict: 'real',
+      predicted_class: 'real',
+      fake_confidence: 0.3038,
+      real_confidence: 0.6962,
+      class_scores: {
+        real: 0.301,
+        face_manipulation: 0.68,
+      },
+      windows: [
+        {
+          start_sec: 0,
+          end_sec: 2.5,
+          verdict: 'REAL',
+          real_confidence: 0.9,
+          fake_confidence: 0.1,
+          class_scores: { real: 0.9, face_manipulation: 0.1 },
+        },
+        {
+          start_sec: 2.5,
+          end_sec: 5,
+          verdict: 'FAKE',
+          real_confidence: 0.2,
+          fake_confidence: 0.8,
+          class_scores: { real: 0.2, face_manipulation: 0.8 },
+        },
+      ],
+    });
+    expect(r.classScores).toEqual([
+      { name: 'Real', score: 0.55 },
+      { name: 'Face Manipulation', score: 0.45 },
+    ]);
+    expect(r.fakePct).toBeCloseTo(30.38, 5);
+  });
+
   it('normalizeVideo keeps window verdicts and the report aggregation methods', () => {
     const r = normalizeVideo({
       verdict: 'fake',
